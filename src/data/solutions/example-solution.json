@@ -14,7 +14,6 @@
 	"nodes": {
 		"EP_F_MP_F_CO_F_BU": {
 			"nodeId": "EP_F_MP_F_CO_F_BU",
-			"title": "BU First In",
 			"position": "BU",
 			"actions": [
 				{
@@ -32,7 +31,6 @@
 		},
 		"EP_F_MP_F_CO_F_BU_RFI_SB": {
 			"nodeId": "EP_F_MP_F_CO_F_BU_RFI_SB",
-			"title": "SB vs BU Open",
 			"position": "SB",
 			"actions": [
 				{
@@ -55,7 +53,6 @@
 		},
 		"EP_F_MP_F_CO_F_BU_RFI_SB_F_BB": {
 			"nodeId": "EP_F_MP_F_CO_F_BU_RFI_SB_F_BB",
-			"title": "BB vs BU Open (SB Folded)",
 			"position": "BB",
 			"actions": [
 				{

@@ -411,11 +411,7 @@ h1 .dim {
 	background: #ef4444;
 }
 
-.warn-under .cell-warn {
-	background: #f59e0b;
-	color: #000;
-}
-
+.warn-under .cell-warn,
 .warn-mismatch .cell-warn {
 	background: #f59e0b;
 	color: #000;
@@ -829,10 +825,6 @@ button.flagged::after {
 	font-size: 13px;
 	font-weight: 700;
 	color: #f3f4f6;
-}
-
-.rv-title-spot-name {
-	color: #f9fafb;
 }
 
 .rv-scenario-badge {

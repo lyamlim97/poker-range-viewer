@@ -40,7 +40,7 @@ A solution has three top-level properties:
 - `rootNodeId` - the ID of the first decision node.
 - `nodes` - an object mapping node IDs to decision or terminal nodes.
 
-Each decision node has a matching `nodeId`, a `title`, a `position`, and an `actions` array. Each action has a unique `id`, a user-facing `label`, and a `rawRangeText` range. Add `nextNodeId` when that action links to another node; its value must match a key in `nodes`.
+Each decision node has a matching `nodeId`, a `position`, and an `actions` array. Each action has a unique `id`, a user-facing `label`, and a `rawRangeText` range. Add `nextNodeId` when that action links to another node; its value must match a key in `nodes`.
 
 For example, this action puts the `AA` range on a raise and links it to the MP decision:
 
@@ -96,7 +96,6 @@ If a line is reached in fewer than 1 in 10,000 hands and its strategy was not sa
 ```json
 {
   "nodeId": "EP_RFI_MP_3B_CO_4B_BU_AI_SB_C_BB_C_EP",
-  "title": "EP after BB calls",
   "position": "EP",
   "tags": ["almost-never-reached"],
   "actions": []

@@ -178,10 +178,9 @@ export default function RangeViewer({ allFiles = {} }) {
 				solutionData={currentRangesData}
 			/>
 
-			{/* Sub-header showing Spot Title & Action overview */}
+			{/* Sub-header showing scenario tags and action path */}
 			<div className="rv-sub-bar">
 				<div className="rv-spot-title">
-					<span className="rv-title-spot-name">{scenario?.title || "Preflop Strategy"}</span>
 					{scenarioTags.map(({ id, label }) => (
 						<span className="rv-scenario-badge" key={id}>
 							{label}

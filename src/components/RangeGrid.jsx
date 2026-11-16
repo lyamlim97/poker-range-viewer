@@ -36,7 +36,7 @@ function Cell({
 		.filter(([, freq]) => freq > 0)
 		.sort(([a], [b]) => actionPriority(a) - actionPriority(b));
 
-	// does this hand's total add up to 100%?
+	// Compare against the prior action range when one is available.
 	const { total, expected, status } = referenceComboFreq
 		? checkHandAgainstRange(hand, comboFreq, referenceComboFreq)
 		: checkHand(actions);
