@@ -22,4 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-data
+
+# Track the sample solution while keeping other data files ignored.
+!src/data/
+src/data/*
+!src/data/solutions/
+src/data/solutions/*
+!src/data/solutions/example-solution.json
