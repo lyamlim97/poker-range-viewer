@@ -32,6 +32,8 @@ Select **Change** to choose a solution. Select an action in the tree to follow t
 
 When a position acts again later in the tree, the viewer checks that node's combined action frequencies against that position's most recent prior action range. For example, EP's later response is checked against EP's earlier raise range. Positions with no prior action range continue to be checked against 100%.
 
+The **Tree validation** section at the bottom checks missing node targets, actions without `nextNodeId`, unreachable nodes, cycles, invalid node IDs or positions, and branches that do not end at a terminal or almost-never-reached node. Every action must link to an explicit node, including folds that end at terminal nodes.
+
 ### Solution file structure
 
 A solution has three top-level properties:

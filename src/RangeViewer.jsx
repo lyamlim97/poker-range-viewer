@@ -4,6 +4,7 @@ import ActionSummary from "./components/ActionSummary";
 import HandDetail from "./components/HandDetail";
 import PreflopNav from "./components/PreflopNav";
 import SolutionModal from "./components/SolutionModal";
+import TreeValidation from "./components/TreeValidation";
 import { parseDetailedRange } from "./utils/parseRange";
 import {
 	POSITIONS_6MAX,
@@ -142,7 +143,7 @@ export default function RangeViewer({ allFiles = {} }) {
 			typeof scenario?.referenceRangeText === "string"
 				? parseDetailedRange(scenario.referenceRangeText).comboFreq
 				: null,
-		[scenario?.referenceRangeText]
+		[scenario]
 	);
 
 	return (
@@ -214,6 +215,8 @@ export default function RangeViewer({ allFiles = {} }) {
 					</>
 				)}
 			</div>
+
+			<TreeValidation solutionData={currentRangesData} />
 
 			{/* Solution Selection Modal */}
 			<SolutionModal

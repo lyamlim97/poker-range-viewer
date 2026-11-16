@@ -995,6 +995,87 @@ button.flagged::after {
 	align-items: flex-start;
 }
 
+.rv-tree-validation {
+	width: 100%;
+	padding: 14px 16px;
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+}
+
+.rv-tree-validation-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.rv-tree-validation-header h2 {
+	margin: 0;
+	font-size: 14px;
+}
+
+.rv-tree-validation-status {
+	flex: 0 0 auto;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.rv-tree-validation-status.has-issues {
+	color: #fbbf24;
+}
+
+.rv-tree-validation-status.is-complete {
+	color: #34d399;
+}
+
+.rv-tree-validation-description,
+.rv-tree-validation-empty {
+	margin: 6px 0 0;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.rv-tree-validation-groups {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 12px;
+	margin-top: 12px;
+}
+
+.rv-tree-validation-group {
+	min-width: 0;
+	border-top: 1px solid var(--border);
+	padding-top: 10px;
+}
+
+.rv-tree-validation-group h3 {
+	margin: 0 0 7px;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.rv-tree-validation-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 150px;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.rv-tree-validation-list code {
+	display: block;
+	overflow-wrap: anywhere;
+	padding: 3px 6px;
+	border-radius: 4px;
+	background: rgba(0, 0, 0, 0.18);
+	color: var(--muted);
+	font-size: 11px;
+}
+
 .rv-terminal-state {
 	display: flex;
 	flex: 1;
