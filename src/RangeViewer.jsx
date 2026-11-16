@@ -147,6 +147,13 @@ export default function RangeViewer({ allFiles = {} }) {
 		() => parseDetailedRange(rawVal),
 		[rawVal]
 	);
+	const referenceComboFreq = useMemo(
+		() =>
+			typeof scenario?.referenceRangeText === "string"
+				? parseDetailedRange(scenario.referenceRangeText).comboFreq
+				: null,
+		[scenario?.referenceRangeText]
+	);
 
 	return (
 		<div className="rv-container">
@@ -214,6 +221,8 @@ export default function RangeViewer({ allFiles = {} }) {
 								selectedHand={selectedHand}
 								onHoverHand={setSelectedHand}
 								onSelectHand={setSelectedHand}
+								comboFreq={comboFreq}
+								referenceComboFreq={referenceComboFreq}
 								className="rv-range-grid"
 							/>
 						</div>

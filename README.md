@@ -30,6 +30,8 @@ The **Range Viewer** mode reads solution files from `src/data/solutions/`. Add a
 
 Select **Change** to choose a solution. Select an action in the tree to follow that branch. The tree shows the action history and previews later positions assuming intervening players fold. Select a previous action to rewind and explore a different branch. The range grid and sidebar show the current node's action frequencies and combo details.
 
+When a position acts again later in the tree, the viewer checks that node's combined action frequencies against that position's most recent prior action range. For example, EP's later response is checked against EP's earlier raise range. Positions with no prior action range continue to be checked against 100%.
+
 ### Solution file structure
 
 A solution has three top-level properties:

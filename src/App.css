@@ -416,6 +416,11 @@ h1 .dim {
 	color: #000;
 }
 
+.warn-mismatch .cell-warn {
+	background: #f59e0b;
+	color: #000;
+}
+
 button.flagged {
 	position: relative;
 }

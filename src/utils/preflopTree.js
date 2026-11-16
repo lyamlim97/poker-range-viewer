@@ -185,13 +185,22 @@ function getActionLabel(action) {
 	return typeof action === "string" ? action : action?.label;
 }
 
+function getActionRange(action, node) {
+	const label = getActionLabel(action);
+	const range =
+		typeof action === "object" && action !== null
+			? action.rawRangeText ?? node.strategy?.[label]
+			: node.strategy?.[label];
+	return typeof range === "string" ? range : null;
+}
+
 function findNodeAction(node, action) {
 	return getNodeActions(node).find(
 		(option) => getActionLabel(option) === action || option?.id === action
 	);
 }
 
-function resolveTreeNode(solutionData, actionHistory) {
+function resolveTreeNode(solutionData, actionHistory, onTransition) {
 	const nodes = getSolutionNodes(solutionData);
 	const rootNodeId = solutionData?.rootNodeId || solutionData?.tree?.root;
 	if (!rootNodeId || !nodes) return null;
@@ -203,6 +212,7 @@ function resolveTreeNode(solutionData, actionHistory) {
 		const nodePosition = getNodePosition(node);
 		if (nodePosition && nodePosition !== event.position) return null;
 		const option = findNodeAction(node, event.action);
+		onTransition?.(node, event, option);
 		const nextId =
 			(typeof option === "object" ? option.nextNodeId : null) ??
 			node.next?.[event.action] ??
@@ -213,6 +223,16 @@ function resolveTreeNode(solutionData, actionHistory) {
 	}
 
 	return node;
+}
+
+function getPreviousActionRange(solutionData, actionHistory, position) {
+	let rangeText = null;
+	resolveTreeNode(solutionData, actionHistory, (node, event, action) => {
+		if (event.position === position) {
+			rangeText = getActionRange(action, node);
+		}
+	});
+	return rangeText;
 }
 
 function resolveSpot(solutionData, position, actionHistory) {
@@ -431,6 +451,10 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 		title: node?.title || spot?.title || defaultTitle,
 		terminal: node?.terminal === true,
 		tags: Array.isArray(node?.tags) ? node.tags : [],
+		referenceRangeText:
+			node && nodePosition === position
+				? getPreviousActionRange(solutionData, actionHistory, position)
+				: null,
 		actions: limitActionsToStack(actions, position, actionHistory),
 		strategy: strategyUnavailable
 			? {}
@@ -439,10 +463,7 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 					getNodeActions(node)
 						.map((action) => {
 							const label = getActionLabel(action);
-							const range =
-								typeof action === "object"
-									? action.rawRangeText ?? node.strategy?.[label]
-									: node.strategy?.[label];
+							const range = getActionRange(action, node);
 							return typeof label === "string" && typeof range === "string"
 								? [label, range]
 								: null;

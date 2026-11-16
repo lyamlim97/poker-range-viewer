@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import { parseRange } from "./parseRange";
+import { getCombosForHand, parseRange } from "./parseRange";
 
 // A hand can be off by this much (1%) before it counts as wrong,
 // so splits like 33.3 + 33.3 + 33.3 still pass.
@@ -16,6 +16,37 @@ export function checkHand(actions) {
 	if (total > 1 + TOLERANCE) status = "over";
 	else if (total > 0 && total < 1 - TOLERANCE) status = "under";
 	return { total, status };
+}
+
+export function checkHandAgainstRange(hand, actionsByCombo, referenceByCombo) {
+	const combos = getCombosForHand(hand);
+	let total = 0;
+	let expected = 0;
+	let hasOver = false;
+	let hasUnder = false;
+
+	for (const { id } of combos) {
+		const comboTotal = Object.values(actionsByCombo[id] || {}).reduce(
+			(sum, frequency) => sum + frequency,
+			0
+		);
+		const referenceTotal = Object.values(referenceByCombo[id] || {}).reduce(
+			(sum, frequency) => sum + frequency,
+			0
+		);
+
+		total += comboTotal;
+		expected += referenceTotal;
+		if (comboTotal > referenceTotal + TOLERANCE) hasOver = true;
+		else if (comboTotal < referenceTotal - TOLERANCE) hasUnder = true;
+	}
+
+	const comboCount = combos.length || 1;
+	return {
+		total: total / comboCount,
+		expected: expected / comboCount,
+		status: hasOver && hasUnder ? "mismatch" : hasOver ? "over" : hasUnder ? "under" : null,
+	};
 }
 
 // All the wrong hands in one spot: { over: [{ hand, total }], under: [...] }

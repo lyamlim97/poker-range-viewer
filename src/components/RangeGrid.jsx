@@ -1,6 +1,6 @@
 import { RANKS } from "../utils/parseRange";
 import { actionColor } from "../utils/actions";
-import { checkHand } from "../utils/checkRange";
+import { checkHand, checkHandAgainstRange } from "../utils/checkRange";
 
 function handAt(row, col) {
 	if (row === col) return RANKS[row] + RANKS[col];
@@ -20,7 +20,15 @@ function actionPriority(action) {
 	return 4;
 }
 
-function Cell({ hand, actions = {}, isSelected = false, onHover, onSelect }) {
+function Cell({
+	hand,
+	actions = {},
+	comboFreq = {},
+	referenceComboFreq,
+	isSelected = false,
+	onHover,
+	onSelect,
+}) {
 	const type = hand.length === 2 ? "pair" : hand.endsWith("s") ? "suited" : "offsuit";
 
 	// Put aggressive actions first so their segments start at the left edge.
@@ -29,12 +37,20 @@ function Cell({ hand, actions = {}, isSelected = false, onHover, onSelect }) {
 		.sort(([a], [b]) => actionPriority(a) - actionPriority(b));
 
 	// does this hand's total add up to 100%?
-	const { total, status } = checkHand(actions);
+	const { total, expected, status } = referenceComboFreq
+		? checkHandAgainstRange(hand, comboFreq, referenceComboFreq)
+		: checkHand(actions);
 
 	const tip = (entries.length > 0
 		? `${hand} · ` + entries.map(([act, f]) => `${act}: ${Math.round(f * 100)}%`).join(", ")
 		: `${hand} · Not in range`)
-		+ (status ? ` · ⚠ total ${+(total * 100).toFixed(1)}%` : "");
+		+ (status
+			? ` · ⚠ total ${+(total * 100).toFixed(1)}%${
+					referenceComboFreq
+						? ` (expected ${+(expected * 100).toFixed(1)}%)`
+						: ""
+				}`
+			: "");
 
 	return (
 		<div
@@ -67,6 +83,8 @@ export default function RangeGrid({
 	selectedHand,
 	onHoverHand,
 	onSelectHand,
+	comboFreq = {},
+	referenceComboFreq,
 	className = "",
 }) {
 	const cells = [];
@@ -78,6 +96,8 @@ export default function RangeGrid({
 					key={hand}
 					hand={hand}
 					actions={freq[hand] || {}}
+					comboFreq={comboFreq}
+					referenceComboFreq={referenceComboFreq}
 					isSelected={selectedHand === hand}
 					onHover={onHoverHand}
 					onSelect={onSelectHand}
