@@ -77,7 +77,20 @@ function RangeCheck({ empty, over, under }) {
 export default function Viewer({ initialRanges, fileName }) {
 	const [selected, setSelected] = useState(null);
 	const [resetKey, setResetKey] = useState(0);
-	const [rangesData, setRangesData] = useState(initialRanges);
+	const [rangeState, setRangeState] = useState(() => ({
+		source: initialRanges,
+		data: initialRanges,
+	}));
+	const rangesData = rangeState.source === initialRanges ? rangeState.data : initialRanges;
+	const setRangesData = (nextData) => {
+		setRangeState((previous) => ({
+			source: initialRanges,
+			data:
+				typeof nextData === "function"
+					? nextData(previous.source === initialRanges ? previous.data : initialRanges)
+					: nextData,
+		}));
+	};
 
 	const rawVal = selected ? getNestedValue(rangesData, selected) : "";
 	const freq = parseRange(rawVal);

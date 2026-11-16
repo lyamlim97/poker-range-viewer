@@ -1,6 +1,57 @@
 export const RANKS = "AKQJT98765432";
 const R = "[2-9TJQKA]";
 const idx = (r) => RANKS.indexOf(r);
+export const SUITS = ["s", "h", "d", "c"];
+
+export function getCombosForHand(hand) {
+	if (!hand) return [];
+	if (hand.length === 2) {
+		const r = hand[0];
+		const combos = [];
+		for (let i = 0; i < SUITS.length; i++) {
+			for (let j = i + 1; j < SUITS.length; j++) {
+				const s1 = SUITS[i];
+				const s2 = SUITS[j];
+				combos.push({
+					id: `${r}${s1}${r}${s2}`,
+					card1: { rank: r, suit: s1 },
+					card2: { rank: r, suit: s2 },
+					label: `${r}${s1}${r}${s2}`,
+				});
+			}
+		}
+		return combos;
+	}
+
+	const r1 = hand[0];
+	const r2 = hand[1];
+	const isSuited = hand.endsWith("s");
+
+	if (isSuited) {
+		return SUITS.map((s) => ({
+			id: `${r1}${s}${r2}${s}`,
+			card1: { rank: r1, suit: s },
+			card2: { rank: r2, suit: s },
+			label: `${r1}${s}${r2}${s}`,
+		}));
+	}
+
+	// Offsuit: 12 combos
+	const combos = [];
+	for (const s1 of SUITS) {
+		for (const s2 of SUITS) {
+			if (s1 !== s2) {
+				combos.push({
+					id: `${r1}${s1}${r2}${s2}`,
+					card1: { rank: r1, suit: s1 },
+					card2: { rank: r2, suit: s2 },
+					label: `${r1}${s1}${r2}${s2}`,
+				});
+			}
+		}
+	}
+	return combos;
+}
 
 function expand(token) {
 	let m;
@@ -63,31 +114,62 @@ function expand(token) {
 }
 
 export function parseRange(input) {
-	const freq = {};
-	if (!input) return freq;
+	return parseDetailedRange(input).freq;
+}
 
-	// If input is an object containing actions (e.g. { jam: "...", raise: "...", call: "..." })
+export function parseDetailedRange(input) {
+	const freq = {};
+	const comboFreq = {};
+	const allActions = [];
+
+	if (!input) return { freq, comboFreq, allActions };
+
 	if (typeof input === "object") {
 		for (const [action, strVal] of Object.entries(input)) {
 			if (typeof strVal !== "string") continue;
-			const subFreq = parseSingleString(strVal, action);
-			for (const [h, actions] of Object.entries(subFreq)) {
+			if (!allActions.includes(action)) allActions.push(action);
+
+			const sub = parseSingleStringWithCombos(strVal, action);
+			for (const [h, actions] of Object.entries(sub.freq)) {
 				if (!freq[h]) freq[h] = {};
 				for (const [act, val] of Object.entries(actions)) {
 					freq[h][act] = (freq[h][act] || 0) + val;
 				}
 			}
+			for (const [cId, actions] of Object.entries(sub.comboFreq)) {
+				if (!comboFreq[cId]) comboFreq[cId] = {};
+				for (const [act, val] of Object.entries(actions)) {
+					comboFreq[cId][act] = (comboFreq[cId][act] || 0) + val;
+				}
+			}
 		}
-		return freq;
+		return { freq, comboFreq, allActions };
 	}
 
-	return parseSingleString(input, "raise");
+	allActions.push("raise");
+	const sub = parseSingleStringWithCombos(input, "raise");
+	return { freq: sub.freq, comboFreq: sub.comboFreq, allActions };
 }
 
-function parseSingleString(str, defaultAction = "raise") {
+function normalizeComboId(r1, s1, r2, s2) {
+	if (idx(r1) > idx(r2)) {
+		return `${r2}${s2}${r1}${s1}`;
+	}
+	if (r1 === r2) {
+		const i1 = SUITS.indexOf(s1);
+		const i2 = SUITS.indexOf(s2);
+		if (i1 > i2) {
+			return `${r2}${s2}${r1}${s1}`;
+		}
+	}
+	return `${r1}${s1}${r2}${s2}`;
+}
+
+function parseSingleStringWithCombos(str, defaultAction = "raise") {
 	const freq = {};
+	const comboFreq = {};
 	const partial = {};
-	if (!str) return freq;
+	if (!str) return { freq, comboFreq };
 
 	function addTokens(text, baseWeight, action) {
 		for (let raw of text.split(",")) {
@@ -95,22 +177,29 @@ function parseSingleString(str, defaultAction = "raise") {
 			if (!raw) continue;
 
 			let weight = baseWeight;
-			const w = raw.match(/^(.+):([\d.]+)$/);
+			const w = raw.match(/^(.+?)\s*:\s*(\d+(?:\.\d+)?)$/);
 			if (w) {
-				raw = w[1];
+				raw = w[1].trim();
 				weight = parseFloat(w[2]) * baseWeight;
 			}
 
 			const c = raw.match(new RegExp(`^(${R})([cdhs])(${R})([cdhs])$`));
 			if (c) {
 				let [, r1, s1, r2, s2] = c;
-				if (idx(r1) > idx(r2)) [r1, r2] = [r2, r1];
+				if (idx(r1) > idx(r2)) {
+					[r1, r2] = [r2, r1];
+					[s1, s2] = [s2, s1];
+				}
 				const isPair = r1 === r2;
 				const hand = isPair ? r1 + r2 : r1 + r2 + (s1 === s2 ? "s" : "o");
 				const total = isPair ? 6 : s1 === s2 ? 4 : 12;
 
 				if (!partial[hand]) partial[hand] = {};
 				partial[hand][action] = (partial[hand][action] || 0) + weight / total;
+
+				const normId = normalizeComboId(r1, s1, r2, s2);
+				if (!comboFreq[normId]) comboFreq[normId] = {};
+				comboFreq[normId][action] = (comboFreq[normId][action] || 0) + weight;
 				continue;
 			}
 
@@ -122,6 +211,12 @@ function parseSingleString(str, defaultAction = "raise") {
 			for (const h of hands) {
 				if (!freq[h]) freq[h] = {};
 				freq[h][action] = (freq[h][action] || 0) + weight;
+
+				const combos = getCombosForHand(h);
+				for (const cmb of combos) {
+					if (!comboFreq[cmb.id]) comboFreq[cmb.id] = {};
+					comboFreq[cmb.id][action] = (comboFreq[cmb.id][action] || 0) + weight;
+				}
 			}
 		}
 	}
@@ -139,5 +234,5 @@ function parseSingleString(str, defaultAction = "raise") {
 		}
 	}
 
-	return freq;
+	return { freq, comboFreq };
 }

@@ -28,11 +28,13 @@ export function checkSpot(freq) {
 	return result;
 }
 
+export function isRangeLeaf(node) {
+	return Object.values(node).every((value) => typeof value === "string");
+}
+
 // Scan every spot in ranges.json. Returns the ids of the ones with a problem.
 export function findFlaggedSpots(node, path = [], found = new Set()) {
-	const isLeaf = Object.values(node).every((v) => typeof v === "string");
-
-	if (isLeaf) {
+	if (isRangeLeaf(node)) {
 		const { over, under } = checkSpot(parseRange(node));
 		if (over.length || under.length) found.add(path.join(" > "));
 		return found;

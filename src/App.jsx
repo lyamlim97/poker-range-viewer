@@ -1,13 +1,15 @@
 import { useState } from "react";
 import Viewer from "./Viewer";
+import RangeViewer from "./RangeViewer";
 
-// Every file named src/data/ranges-<size>.json becomes a tab.
-// e.g. ranges-2.5x.json -> a tab labelled "2.5x"
-const files = import.meta.glob("./data/ranges-*.json", { eager: true, import: "default" });
-// Your sizes, in the order you want the tabs. Anything not listed goes last.
+// Scenario tabs still use the legacy ranges files.
+const scenarioFiles = import.meta.glob("./data/ranges-*.json", { eager: true, import: "default" });
+// The range viewer should read from solution JSON files instead of the ranges-2x / ranges-2p5x files.
+const viewerFiles = import.meta.glob("./data/solutions/*.json", { eager: true, import: "default" });
+
 const ORDER = ["2x", "2p5x", "3x"];
 const rank = (label) => (ORDER.includes(label) ? ORDER.indexOf(label) : ORDER.length);
-const TABS = Object.entries(files)
+const TABS = Object.entries(scenarioFiles)
 	.map(([path, ranges]) => ({
 		label: path.match(/ranges-(.+)\.json$/)[1],
 		file: path.split("/").pop(),
@@ -18,28 +20,54 @@ const TABS = Object.entries(files)
 
 export default function App() {
 	const [active, setActive] = useState(0);
+	const [mode, setMode] = useState("scenarios"); // "scenarios" | "range-viewer"
 
 	return (
 		<>
 			<nav className="tabs">
-				<span className="tabs-label">RFI size</span>
-				{TABS.map((tab, i) => (
+				<div className="mode-toggle">
 					<button
-						key={tab.file}
-						className={i === active ? "tab active" : "tab"}
-						onClick={() => setActive(i)}
+						className={mode === "scenarios" ? "mode-btn active" : "mode-btn"}
+						onClick={() => setMode("scenarios")}
 					>
-						{tab.label}
+						Scenarios
 					</button>
-				))}
+					<button
+						className={mode === "range-viewer" ? "mode-btn active" : "mode-btn"}
+						onClick={() => setMode("range-viewer")}
+					>
+						Range Viewer
+					</button>
+				</div>
 			</nav>
 
-			{/* every tab stays mounted (just hidden) so edits and selections survive switching */}
-			{TABS.map((tab, i) => (
-				<div key={tab.file} hidden={i !== active}>
-					<Viewer initialRanges={tab.ranges} fileName={tab.file} />
-				</div>
-			))}
+			{mode === "scenarios" && (
+				<>
+					<nav className="tabs">
+						<span className="tabs-label">RFI size</span>
+						{TABS.map((tab, i) => (
+							<button
+								key={tab.file}
+								className={i === active ? "tab active" : "tab"}
+								onClick={() => setActive(i)}
+							>
+								{tab.label}
+							</button>
+						))}
+					</nav>
+
+					{/* every tab stays mounted (just hidden) so edits and selections survive switching */}
+					{TABS.map((tab, i) => (
+						<div key={tab.file} hidden={i !== active}>
+							<Viewer initialRanges={tab.ranges} fileName={tab.file} />
+						</div>
+					))}
+				</>
+			)}
+
+			{mode === "range-viewer" && (
+				<RangeViewer allFiles={viewerFiles} />
+			)}
 		</>
 	);
 }

@@ -1,4 +1,4 @@
-// Colours for the actions in ranges.json (matched ignoring case, spaces and hyphens).
+// Match action names with or without sizing amounts, ignoring case, spaces and hyphens.
 // The CSS variables are defined at the top of App.css.
 const KNOWN = {
 	jam: "var(--action-jam)",
@@ -21,6 +21,9 @@ const PALETTE = ["#f59e0b", "#a855f7", "#14b8a6", "#ec4899", "#84cc16", "#06b6d4
 export function actionColor(action) {
 	const key = action.toLowerCase().replace(/[\s-]+/g, "");
 	if (KNOWN[key]) return KNOWN[key];
+
+	const baseAction = key.match(/^(jam|allin|raise|3bet|4bet|5bet|squeeze|bet|call|fold|check)/)?.[1];
+	if (baseAction && KNOWN[baseAction]) return KNOWN[baseAction];
 
 	let hash = 0;
 	for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Btn from "./Btn";
 import { columnsFor } from "../utils/positions";
+import { isRangeLeaf } from "../utils/checkRange";
 
 export default function Section({ title, data, selected, onSelect }) {
 	const [open, setOpen] = useState(true);
@@ -8,8 +9,7 @@ export default function Section({ title, data, selected, onSelect }) {
 	// A leaf is a spot's actions: { Raise: "...", Call: "...", Fold: "..." }.
 	// flat data = one row of buttons whose values are leaves (RFI, BB def)
 	// nested data = several rows of buttons (vs 3bet/5bet, 3bet/5bet)
-	const isLeaf = (node) => Object.values(node).every((v) => typeof v === "string");
-	const nested = !isLeaf(Object.values(data)[0]);
+	const nested = !isRangeLeaf(Object.values(data)[0]);
 	const rows = nested ? Object.entries(data) : [[title, data]];
 	const columns = columnsFor(rows.map(([, buttons]) => buttons));
 
