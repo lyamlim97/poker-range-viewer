@@ -13,10 +13,6 @@ import {
 } from "./utils/preflopTree";
 import "./App.css";
 
-const SCENARIO_TAG_LABELS = {
-	"almost-never-reached": "Almost never reached",
-};
-
 export default function RangeViewer({ allFiles = {} }) {
 	const availableSolutions = useMemo(
 		() =>
@@ -132,13 +128,7 @@ export default function RangeViewer({ allFiles = {} }) {
 	const scenario = useMemo(() => {
 		return resolveSpotFromSolution(activePosition, actionPath, currentRangesData);
 	}, [activePosition, actionPath, currentRangesData]);
-	const scenarioTags = (scenario?.tags || []).map((id) => ({
-		id,
-		label: SCENARIO_TAG_LABELS[id] || id,
-	}));
-	const hasUnsavedRareStrategy = scenarioTags.some(
-		({ id }) => id === "almost-never-reached"
-	);
+	const hasUnsavedRareStrategy = scenario?.tags?.includes("almost-never-reached") === true;
 
 	// The solution resolver returns the strategy alongside its title and action path.
 	const rawVal = scenario?.strategy;
@@ -177,24 +167,6 @@ export default function RangeViewer({ allFiles = {} }) {
 				openSize={openSizeNumeric}
 				solutionData={currentRangesData}
 			/>
-
-			{/* Sub-header showing scenario tags and action path */}
-			<div className="rv-sub-bar">
-				<div className="rv-spot-title">
-					{scenarioTags.map(({ id, label }) => (
-						<span className="rv-scenario-badge" key={id}>
-							{label}
-						</span>
-					))}
-					{scenario?.path && <span className="rv-title-path-dim">({scenario.path})</span>}
-				</div>
-				<div className="rv-table-status">
-					Preflop Solution:{" "}
-					<strong style={{ color: "var(--accent)" }}>
-						{selectedSolution?.format || "Standard"}
-					</strong>
-				</div>
-			</div>
 
 			{/* Main Content Area: Grid on Left, Sidebar on Right */}
 			<div className="rv-body">

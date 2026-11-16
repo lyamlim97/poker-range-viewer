@@ -805,50 +805,6 @@ button.flagged::after {
 	}
 }
 
-/* Sub-bar: Spot Title & Preflop Status */
-.rv-sub-bar {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	background: var(--card);
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	padding: 8px 12px;
-}
-
-.rv-spot-title {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 13px;
-	font-weight: 700;
-	color: #f3f4f6;
-}
-
-.rv-scenario-badge {
-	border: 1px solid rgba(245, 158, 11, 0.4);
-	border-radius: 999px;
-	padding: 2px 8px;
-	background: rgba(245, 158, 11, 0.12);
-	color: #fbbf24;
-	font-size: 10px;
-	font-weight: 700;
-	white-space: nowrap;
-}
-
-.rv-title-path-dim {
-	font-size: 11px;
-	font-weight: 400;
-	color: var(--muted);
-}
-
-.rv-table-status {
-	font-size: 12px;
-	color: var(--muted);
-}
-
 /* Solution Modal */
 .rv-modal-backdrop {
 	position: fixed;
