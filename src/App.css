@@ -1525,6 +1525,10 @@ button.flagged::after {
 	cursor: move;
 }
 
+.dag-node-header > strong {
+	flex: none;
+}
+
 .dag-node-id {
 	min-width: 0;
 	margin-left: auto;
@@ -1552,11 +1556,20 @@ button.flagged::after {
 }
 
 .dag-tag.warning {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	gap: 3px;
+	height: 18px;
+	padding: 0 5px;
 	background: rgba(251, 191, 36, 0.15);
 	color: #fbbf24;
 	font-size: 11px;
+	line-height: 18px;
 	text-transform: none;
 	font-weight: normal;
+	white-space: nowrap;
 }
 
 .dag-node-actions {

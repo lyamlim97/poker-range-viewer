@@ -349,7 +349,8 @@ export default function DagCanvas({
 												.map((issue) => issue.message)
 												.join("\n")}
 										>
-											⚠ {nodeIssues[id]?.length || 0}
+											<span aria-hidden="true">⚠</span>
+											<span>{nodeIssues[id]?.length || 0}</span>
 										</span>
 									)}
 									<span className="dag-node-id">{id}</span>
