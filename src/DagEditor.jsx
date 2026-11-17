@@ -99,7 +99,7 @@ function buildValidationGroups(report) {
 		["Outcome actions with links", report.outcomeActionsWithLinks],
 		["Misplaced rare node tags", report.misplacedRareNodeTags],
 		["Terminal node endpoint issues", report.invalidEndpointNodeIds],
-		["Other tree issues", [...report.invalidNodeIds, ...report.invalidEndpointNodeIds]],
+		["Other tree issues", report.invalidNodeIds],
 	].filter(([, values]) => values.length > 0);
 }
 
@@ -145,22 +145,6 @@ export default function DagEditor({
 		(item) => item.id === selectedSolutionId
 	);
 	const isDirty = Boolean(solution && revision > savedRevision);
-	const nodes = useMemo(
-		() =>
-			solution && solution.nodes && !Array.isArray(solution.nodes)
-				? Object.entries(solution.nodes).map(([id, node]) => ({ id, node }))
-				: [],
-		[solution]
-	);
-	const missingRangeItems = nodes.flatMap(({ id, node }) =>
-		(Array.isArray(node?.actions) ? node.actions : [])
-			.map((action) =>
-				getRangeStatus(action, node) === "Range needed"
-					? `${id}: ${getActionLabel(action)}`
-					: null
-			)
-			.filter(Boolean)
-	);
 	const selectedNode = solution?.nodes?.[selectedNodeId] || null;
 	const selectedActions = Array.isArray(selectedNode?.actions)
 		? selectedNode.actions
@@ -214,6 +198,7 @@ export default function DagEditor({
 		() => (solution ? validateSolutionTree(solution) : null),
 		[solution]
 	);
+	const missingRangeItems = validationReport?.actionsWithoutRange || [];
 	const selectedNodeIssues =
 		validationReport?.nodeIssues?.[selectedNodeId] || [];
 	const validationGroups = validationReport

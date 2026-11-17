@@ -1,12 +1,20 @@
+import { memo } from "react";
 import { RANKS } from "../utils/parseRange";
 import { actionColor } from "../utils/actions";
 import { checkHand, checkHandAgainstRange } from "../utils/checkRange";
+
+const EMPTY_ACTIONS = {};
+const EMPTY_FREQ = {};
 
 function handAt(row, col) {
 	if (row === col) return RANKS[row] + RANKS[col];
 	if (col > row) return RANKS[row] + RANKS[col] + "s";
 	return RANKS[col] + RANKS[row] + "o";
 }
+
+const HANDS = Array.from({ length: 13 }, (_, row) =>
+	Array.from({ length: 13 }, (_, col) => handAt(row, col))
+).flat();
 
 function isCallAction(action) {
 	return /^call(?:\s|$)/i.test(action);
@@ -20,10 +28,10 @@ function actionPriority(action) {
 	return 4;
 }
 
-function Cell({
+const Cell = memo(function Cell({
 	hand,
-	actions = {},
-	comboFreq = {},
+	actions = EMPTY_ACTIONS,
+	comboFreq = EMPTY_FREQ,
 	referenceComboFreq,
 	referenceAction,
 	isSelected = false,
@@ -77,36 +85,30 @@ function Cell({
 			{status && <span className="cell-warn">!</span>}
 		</div>
 	);
-}
+});
 
 export default function RangeGrid({
-	freq = {},
+	freq = EMPTY_FREQ,
 	selectedHand,
 	onHoverHand,
 	onSelectHand,
-	comboFreq = {},
+	comboFreq = EMPTY_FREQ,
 	referenceComboFreq,
 	referenceAction,
 	className = "",
 }) {
-	const cells = [];
-	for (let row = 0; row < 13; row++) {
-		for (let col = 0; col < 13; col++) {
-			const hand = handAt(row, col);
-			cells.push(
-				<Cell
-					key={hand}
-					hand={hand}
-					actions={freq[hand] || {}}
-					comboFreq={comboFreq}
-					referenceComboFreq={referenceComboFreq}
-					referenceAction={referenceAction}
-					isSelected={selectedHand === hand}
-					onHover={onHoverHand}
-					onSelect={onSelectHand}
-				/>
-			);
-		}
-	}
+	const cells = HANDS.map((hand) => (
+		<Cell
+			key={hand}
+			hand={hand}
+			actions={freq[hand] || EMPTY_ACTIONS}
+			comboFreq={comboFreq}
+			referenceComboFreq={referenceComboFreq}
+			referenceAction={referenceAction}
+			isSelected={selectedHand === hand}
+			onHover={onHoverHand}
+			onSelect={onSelectHand}
+		/>
+	));
 	return <div className={`range-grid ${className}`}>{cells}</div>;
 }

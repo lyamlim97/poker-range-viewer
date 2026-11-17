@@ -38,6 +38,8 @@ export default function DagCanvas({
 	const storageKey = `dag-positions:${layoutKey}`;
 	const containerRef = useRef(null);
 	const dragRef = useRef(null);
+	const dragFrameRef = useRef(null);
+	const pendingDragRef = useRef(null);
 	const [positions, setPositions] = useState(() => loadPositions(storageKey));
 	const [view, setView] = useState({ x: 40, y: 40, k: 1 });
 	const [search, setSearch] = useState("");
@@ -102,7 +104,12 @@ export default function DagCanvas({
 			});
 		};
 		container.addEventListener("wheel", onWheel, { passive: false });
-		return () => container.removeEventListener("wheel", onWheel);
+		return () => {
+			container.removeEventListener("wheel", onWheel);
+			if (dragFrameRef.current !== null) {
+				cancelAnimationFrame(dragFrameRef.current);
+			}
+		};
 	}, []);
 
 	const centerOn = (id) => {
@@ -137,11 +144,11 @@ export default function DagCanvas({
 		};
 	};
 
-	const handlePointerMove = (event) => {
+	const applyDrag = (pointer) => {
 		const drag = dragRef.current;
-		if (!drag || drag.pointerId !== event.pointerId) return;
-		const dx = event.clientX - drag.startX;
-		const dy = event.clientY - drag.startY;
+		if (!drag || drag.pointerId !== pointer.pointerId) return;
+		const dx = pointer.clientX - drag.startX;
+		const dy = pointer.clientY - drag.startY;
 		if (!drag.active) {
 			if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
 			drag.active = true;
@@ -162,6 +169,28 @@ export default function DagCanvas({
 		}
 	};
 
+	const handlePointerMove = (event) => {
+		const drag = dragRef.current;
+		if (!drag || drag.pointerId !== event.pointerId) return;
+		const dx = event.clientX - drag.startX;
+		const dy = event.clientY - drag.startY;
+		if (!drag.active && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+
+		pendingDragRef.current = {
+			pointerId: event.pointerId,
+			clientX: event.clientX,
+			clientY: event.clientY,
+		};
+		if (dragFrameRef.current === null) {
+			dragFrameRef.current = requestAnimationFrame(() => {
+				dragFrameRef.current = null;
+				const pending = pendingDragRef.current;
+				pendingDragRef.current = null;
+				if (pending) applyDrag(pending);
+			});
+		}
+	};
+
 	const savePositions = (next) => {
 		try {
 			localStorage.setItem(storageKey, JSON.stringify(next));
@@ -173,6 +202,13 @@ export default function DagCanvas({
 	const handlePointerUp = (event) => {
 		const drag = dragRef.current;
 		if (!drag || drag.pointerId !== event.pointerId) return;
+		if (dragFrameRef.current !== null) {
+			cancelAnimationFrame(dragFrameRef.current);
+			dragFrameRef.current = null;
+		}
+		const pending = pendingDragRef.current;
+		pendingDragRef.current = null;
+		if (pending) applyDrag(pending);
 		dragRef.current = null;
 		if (containerRef.current?.hasPointerCapture(event.pointerId)) {
 			containerRef.current.releasePointerCapture(event.pointerId);

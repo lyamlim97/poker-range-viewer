@@ -3,9 +3,16 @@ const R = "[2-9TJQKA]";
 const idx = (r) => RANKS.indexOf(r);
 export const SUITS = ["s", "h", "d", "c"];
 const solutionRangeCaches = new WeakMap();
+const handComboCache = new Map();
+
+function cacheHandCombos(hand, combos) {
+	handComboCache.set(hand, combos);
+	return combos;
+}
 
 export function getCombosForHand(hand) {
 	if (!hand) return [];
+	if (handComboCache.has(hand)) return handComboCache.get(hand);
 	if (hand.length === 2) {
 		const r = hand[0];
 		const combos = [];
@@ -21,7 +28,7 @@ export function getCombosForHand(hand) {
 				});
 			}
 		}
-		return combos;
+		return cacheHandCombos(hand, combos);
 	}
 
 	const r1 = hand[0];
@@ -29,12 +36,12 @@ export function getCombosForHand(hand) {
 	const isSuited = hand.endsWith("s");
 
 	if (isSuited) {
-		return SUITS.map((s) => ({
+		return cacheHandCombos(hand, SUITS.map((s) => ({
 			id: `${r1}${s}${r2}${s}`,
 			card1: { rank: r1, suit: s },
 			card2: { rank: r2, suit: s },
 			label: `${r1}${s}${r2}${s}`,
-		}));
+		})));
 	}
 
 	// Offsuit: 12 combos
@@ -51,7 +58,7 @@ export function getCombosForHand(hand) {
 			}
 		}
 	}
-	return combos;
+	return cacheHandCombos(hand, combos);
 }
 
 function expand(token) {
