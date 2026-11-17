@@ -5,9 +5,11 @@ import {
 	getActionKey,
 	getActionLabel,
 	getActionRange,
+	getOrderedActions,
 	getRangeClass,
 	getRangeStatus,
 } from "./utils/actionHelpers";
+import { actionColor } from "./utils/actions";
 import {
 	getExpectedNextNodeId,
 	validateSolutionTree,
@@ -1061,8 +1063,7 @@ export default function DagEditor({
 
 									{selectedNode.terminal !== true && selectedActions.length > 0 && (
 										<div className="range-editor-action-list">
-											{selectedActions.map((action, index) => {
-												const key = getActionKey(action, index);
+											{getOrderedActions(selectedActions).map(({ action, key }) => {
 												const label = getActionLabel(action);
 												const target =
 													typeof action === "object"
@@ -1092,6 +1093,9 @@ export default function DagEditor({
 																? "range-editor-action-item active"
 																: "range-editor-action-item"
 														}
+														style={{
+															"--dag-action-color": actionColor(label),
+														}}
 													>
 														<button
 															type="button"

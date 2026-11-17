@@ -1,3 +1,5 @@
+import { getOrderedActions } from "./actionHelpers";
+
 export const NODE_WIDTH = 210;
 export const HEADER_HEIGHT = 30;
 export const ROW_HEIGHT = 24;
@@ -70,10 +72,10 @@ export function buildEdges(solution) {
 	const nodes = solution?.nodes || {};
 	const edges = [];
 	for (const [from, node] of Object.entries(nodes)) {
-		getActions(node).forEach((action, actionIndex) => {
+		getOrderedActions(getActions(node)).forEach(({ action, visualIndex }) => {
 			const to = getTarget(action);
 			if (to && Object.hasOwn(nodes, to)) {
-				edges.push({ id: `${from}:${actionIndex}`, from, to, actionIndex });
+				edges.push({ id: `${from}:${visualIndex}`, from, to, actionIndex: visualIndex });
 			}
 		});
 	}

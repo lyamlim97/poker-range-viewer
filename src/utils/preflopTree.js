@@ -1,3 +1,5 @@
+import { getOrderedActions } from "./actionHelpers";
+
 export const POSITIONS_6MAX = [
 	{ id: "EP", defaultStack: 100 },
 	{ id: "MP", defaultStack: 100 },
@@ -444,13 +446,17 @@ export function computePositionActionOptions(
 		const allowed = new Set(
 			limitActionsToStack(actions.map(({ label }) => label), position, actionHistory)
 		);
-		return actions.filter(({ label }) => allowed.has(label));
+		return getOrderedActions(actions)
+			.map(({ action }) => action)
+			.filter(({ label }) => allowed.has(label));
 	}
 
-	return computePositionActions(posId, actionHistory, openSize, solutionData).map((label) => ({
-		id: label,
-		label,
-	}));
+	return getOrderedActions(
+		computePositionActions(posId, actionHistory, openSize, solutionData).map((label) => ({
+			id: label,
+			label,
+		}))
+	).map(({ action }) => action);
 }
 
 export function computePositionStack(posId, actionHistory = {}, defaultStack = 100) {

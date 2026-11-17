@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { getActionKey, getActionLabel, getRangeClass, getRangeStatus } from "../utils/actionHelpers";
+import {
+	getActionLabel,
+	getOrderedActions,
+	getRangeClass,
+	getRangeStatus,
+} from "../utils/actionHelpers";
+import { actionColor } from "../utils/actions";
 import {
 	HEADER_HEIGHT,
 	NODE_WIDTH,
@@ -354,8 +360,7 @@ export default function DagCanvas({
 											No actions yet
 										</div>
 									)}
-									{actions.map((action, index) => {
-										const key = getActionKey(action, index);
+									{getOrderedActions(actions).map(({ action, key }) => {
 										const status = getRangeStatus(action, node);
 										const target =
 											action && typeof action === "object"
@@ -384,6 +389,9 @@ export default function DagCanvas({
 														? "dag-action-row active"
 														: "dag-action-row"
 												}
+												style={{
+													"--dag-action-color": actionColor(getActionLabel(action)),
+												}}
 											>
 												<button
 													type="button"

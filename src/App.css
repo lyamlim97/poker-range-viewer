@@ -13,17 +13,16 @@
 	--fill: #f75454;
 	--empty: #232b35;
 
-	/* Multi-action shades of red and other choices */
+	/* Action colours: this is the shared colour location for the viewer and DAG */
 	--action-jam: #7f1d1d;
-	/* Deep dark red */
 	--action-raise: #dc2626;
-	/* Vibrant red */
+	--action-3bet: #ef4444;
+	--action-4bet: #b91c1c;
+	--action-5bet: #991b1b;
+	--action-squeeze: #9f1239;
 	--action-bet: #f87171;
-	/* Light red */
 	--action-call: #10b981;
-	/* Green */
 	--action-fold: #2a7785;
-	/* Blue */
 }
 
 * {
@@ -1595,6 +1594,8 @@ button.flagged::after {
 	display: flex;
 	align-items: center;
 	height: 24px;
+	border-left: 3px solid var(--dag-action-color);
+	padding-left: 1px;
 }
 
 .dag-action-row.active {
@@ -1645,6 +1646,8 @@ button.flagged::after {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	color: var(--dag-action-color);
+	font-weight: 650;
 }
 
 .dag-action-badge {
@@ -1960,6 +1963,7 @@ button.flagged::after {
 	flex-direction: column;
 	min-width: 0;
 	border: 1px solid var(--border);
+	border-left: 3px solid var(--dag-action-color);
 	border-radius: 6px;
 	background: #171d24;
 	overflow: hidden;
@@ -2025,6 +2029,7 @@ button.flagged::after {
 .range-editor-action-top strong {
 	font-size: 12px;
 	font-weight: 600;
+	color: var(--dag-action-color);
 }
 
 .range-editor-action-badges {

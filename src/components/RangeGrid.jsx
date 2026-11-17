@@ -23,7 +23,6 @@ function isCallAction(action) {
 function actionPriority(action) {
 	if (/^(raise|bet|all[\s-]?in|jam|[345][\s-]?bet|squeeze)(?:\s|$)/i.test(action)) return 0;
 	if (isCallAction(action)) return 1;
-	if (/^check(?:\s|$)/i.test(action)) return 2;
 	if (/^fold(?:\s|$)/i.test(action)) return 3;
 	return 4;
 }
