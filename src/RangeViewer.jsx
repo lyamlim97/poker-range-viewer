@@ -388,7 +388,7 @@ export default function RangeViewer({
 			<div className="rv-body">
 				{scenario?.terminal ? (
 					<div className="rv-terminal-state" role="status">
-						<strong>Hand complete</strong>
+						<strong>Preflop over</strong>
 						<span>Pot: {scenario.potSizeBB}bb</span>
 					</div>
 				) : hasUnsavedRareStrategy ? (
