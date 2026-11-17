@@ -26,7 +26,7 @@ To add or update a scenario preset, edit the corresponding `ranges-*.json` file 
 
 ## 3. Range Viewer
 
-The **Range Viewer** mode reads solution files from `src/data/solutions/`. Add a `.json` file in that folder to make it available in the solution selector. The included [example solution](./src/data/solutions/example-solution.json) demonstrates a small linked tree; its ranges are illustrative, not solver output.
+The **Range Viewer** mode reads solution files from `src/data/solutions/`. To add a solution, place its `.json` file in that folder and add its display metadata to `src/data/solution-index.json` using the file name without the `.json` extension as `id`. The viewer fetches only the selected solution, then parses its node ranges while showing progress. The included [example solution](./src/data/solutions/example-solution.json) demonstrates a small linked tree; its ranges are illustrative, not solver output.
 
 Select **Change** to choose a solution. Select an action in the tree to follow that branch. The tree shows the action history and previews later positions assuming intervening players fold. Select a previous action to rewind and explore a different branch. The range grid and sidebar show the current node's action frequencies and combo details.
 

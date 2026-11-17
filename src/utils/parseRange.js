@@ -2,6 +2,7 @@ export const RANKS = "AKQJT98765432";
 const R = "[2-9TJQKA]";
 const idx = (r) => RANKS.indexOf(r);
 export const SUITS = ["s", "h", "d", "c"];
+const solutionRangeCaches = new WeakMap();
 
 export function getCombosForHand(hand) {
 	if (!hand) return [];
@@ -149,6 +150,32 @@ export function parseDetailedRange(input) {
 	allActions.push("raise");
 	const sub = parseSingleStringWithCombos(input, "raise");
 	return { freq: sub.freq, comboFreq: sub.comboFreq, allActions };
+}
+
+function getSolutionRangeCache(solutionData) {
+	if (!solutionData || typeof solutionData !== "object") return null;
+
+	let cache = solutionRangeCaches.get(solutionData);
+	if (!cache) {
+		cache = {
+			strategies: new WeakMap(),
+		};
+		solutionRangeCaches.set(solutionData, cache);
+	}
+	return cache;
+}
+
+export function parseSolutionStrategy(solutionData, strategy) {
+	if (!strategy || typeof strategy !== "object") {
+		return parseDetailedRange(strategy);
+	}
+
+	const cache = getSolutionRangeCache(solutionData)?.strategies;
+	if (!cache) return parseDetailedRange(strategy);
+	if (!cache.has(strategy)) {
+		cache.set(strategy, parseDetailedRange(strategy));
+	}
+	return cache.get(strategy);
 }
 
 function normalizeComboId(r1, s1, r2, s2) {

@@ -540,6 +540,27 @@ button.flagged::after {
 	margin: 0 auto;
 }
 
+.rv-solution-loading {
+	align-items: center;
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 48px auto;
+	max-width: 520px;
+	padding: 24px;
+	text-align: center;
+	width: calc(100% - 48px);
+}
+
+.rv-solution-loading progress {
+	accent-color: var(--accent);
+	height: 12px;
+	width: min(100%, 420px);
+}
+
 /* Preflop action tree */
 .rv-preflop-nav {
 	display: flex;

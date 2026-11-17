@@ -1,75 +1,173 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import RangeGrid from "./components/RangeGrid";
 import ActionSummary from "./components/ActionSummary";
 import HandDetail from "./components/HandDetail";
 import PreflopNav from "./components/PreflopNav";
 import SolutionModal from "./components/SolutionModal";
 import TreeValidation from "./components/TreeValidation";
-import { parseDetailedRange } from "./utils/parseRange";
+import { parseSolutionStrategy } from "./utils/parseRange";
 import {
 	POSITIONS_6MAX,
 	getActionablePositions,
 	getNextPosition,
+	getSolutionNodes,
+	getSolutionNodeStrategy,
 	resolveSpotFromSolution,
 } from "./utils/preflopTree";
 import "./App.css";
 
-export default function RangeViewer({ allFiles = {} }) {
-	const availableSolutions = useMemo(
-		() =>
-			Object.entries(allFiles).flatMap(([path, data]) => {
-				if (!path.includes("/solutions/")) return [];
-				const fileName = path.split("/").pop().replace(".json", "");
-				return [{
-					id: fileName,
-					rootPosition: getNextPosition([], data) || "EP",
-					game: data?.meta?.game || "Missing",
-					stack: data?.meta?.stack || "Missing",
-					type: data?.meta?.type || "Missing",
-					format: data?.meta?.format || fileName,
-					rake: data?.meta?.rake || "Missing",
-					open: data?.meta?.openSize || "Missing",
-					threeBet: data?.meta?.threeBet || "Missing",
-					cashDrop: data?.meta?.cashDrop || "-",
-					fileKey: fileName,
-					title: data?.meta?.title || "Missing",
-					betSizeText: data?.meta?.betSize || fileName,
-				}];
-			}),
-		[allFiles]
-	);
+const EMPTY_SOLUTION_INDEX = [];
+const EMPTY_SOLUTION_URLS = {};
 
-	// Store the selection by key so updated JSON data can replace stale solution objects.
+function yieldToBrowser() {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+export default function RangeViewer({
+	solutionIndex = EMPTY_SOLUTION_INDEX,
+	solutionUrls = EMPTY_SOLUTION_URLS,
+}) {
+	const availableSolutions = solutionIndex;
+
 	const [selectedSolutionKey, setSelectedSolutionKey] = useState(
-		() => availableSolutions[0]?.fileKey || availableSolutions[0]?.id
+		() => availableSolutions[0]?.id
 	);
 	const selectedSolution =
-		availableSolutions.find(
-			(solution) =>
-				solution.fileKey === selectedSolutionKey ||
-				solution.id === selectedSolutionKey
-		) || availableSolutions[0];
+		availableSolutions.find((solution) => solution.id === selectedSolutionKey) ||
+		availableSolutions[0];
 	const [isSolutionModalOpen, setIsSolutionModalOpen] = useState(false);
-
-	// Retrieve ranges data for the active solution.
-	// Important: the range viewer should read custom solution JSON files, not the legacy ranges-2x/ranges-2p5x scenario files.
-	const key = selectedSolution?.fileKey || selectedSolution?.id || "example-solution";
-	const currentRangesData = useMemo(() => {
-		const matchingFile = Object.entries(allFiles).find(
-			([path]) => path.split("/").pop().replace(/\.json$/, "") === key
-		);
-		return matchingFile?.[1] || Object.values(allFiles)[0] || {};
-	}, [allFiles, key]);
-
+	const [loadAttempt, setLoadAttempt] = useState(0);
+	const [loadState, setLoadState] = useState({
+		solutionKey: availableSolutions[0]?.id,
+		attempt: 0,
+		urls: solutionUrls,
+		phase: "loading",
+		progress: 0,
+		parsedNodes: 0,
+		totalNodes: 0,
+		error: null,
+	});
+	const loadStateMatchesSelection =
+		loadState.solutionKey === selectedSolutionKey &&
+		loadState.attempt === loadAttempt &&
+		loadState.urls === solutionUrls;
+	const currentRangesData =
+		loadStateMatchesSelection && loadState.phase === "ready"
+			? loadState.data
+			: null;
 	// The action path is chronological so a position can act more than once.
 	const [activePosition, setActivePosition] = useState(
 		() => availableSolutions[0]?.rootPosition || "EP"
 	);
-	const openSizeNumeric = selectedSolution?.open?.replace("x", "") || "2";
 	const [actionPath, setActionPath] = useState([]);
-
-	// Hand selection for GTO Wizard combo inspector
 	const [selectedHand, setSelectedHand] = useState("AA");
+
+	useEffect(() => {
+		let cancelled = false;
+		const controller = new AbortController();
+		const solutionKey = selectedSolution?.id;
+		const assetUrl = solutionKey
+			? solutionUrls[`./data/solutions/${solutionKey}.json`]
+			: null;
+
+		async function loadSelectedSolution() {
+			try {
+				if (!assetUrl) {
+					throw new Error(
+						`No solution file is registered for "${solutionKey || "selection"}".`
+					);
+				}
+
+				const response = await fetch(assetUrl, { signal: controller.signal });
+				if (!response.ok) {
+					throw new Error(`The solution file could not be loaded (HTTP ${response.status}).`);
+				}
+
+				const solutionData = await response.json();
+				if (!solutionData || typeof solutionData !== "object") {
+					throw new Error("The solution file must contain a JSON object.");
+				}
+				if (cancelled) return;
+
+				const nodes = getSolutionNodes(solutionData) || {};
+				const entries = Object.entries(nodes);
+				setLoadState({
+					solutionKey,
+					attempt: loadAttempt,
+					urls: solutionUrls,
+					phase: "parsing",
+					progress: entries.length === 0 ? 100 : 0,
+					parsedNodes: 0,
+					totalNodes: entries.length,
+					error: null,
+				});
+				await yieldToBrowser();
+
+				for (let index = 0; index < entries.length; index += 1) {
+					if (cancelled) return;
+					const node = entries[index][1];
+					if (node && typeof node === "object") {
+						parseSolutionStrategy(
+							solutionData,
+							getSolutionNodeStrategy(node)
+						);
+					}
+
+					const parsedNodes = index + 1;
+					setLoadState({
+						solutionKey,
+						attempt: loadAttempt,
+						urls: solutionUrls,
+						phase: "parsing",
+						progress: Math.round((parsedNodes / entries.length) * 100),
+						parsedNodes,
+						totalNodes: entries.length,
+						error: null,
+					});
+					await yieldToBrowser();
+				}
+
+				if (cancelled) return;
+				setActivePosition(
+					getNextPosition([], solutionData) ||
+						selectedSolution?.rootPosition ||
+						"EP"
+				);
+				setActionPath([]);
+				setLoadState({
+					solutionKey,
+					attempt: loadAttempt,
+					urls: solutionUrls,
+					phase: "ready",
+					progress: 100,
+					parsedNodes: entries.length,
+					totalNodes: entries.length,
+					data: solutionData,
+					error: null,
+				});
+			} catch (error) {
+				if (cancelled) return;
+				setLoadState({
+					solutionKey,
+					attempt: loadAttempt,
+					urls: solutionUrls,
+					phase: "error",
+					progress: 0,
+					parsedNodes: 0,
+					totalNodes: 0,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+
+		void loadSelectedSolution();
+		return () => {
+			cancelled = true;
+			controller.abort();
+		};
+	}, [selectedSolution, selectedSolutionKey, solutionUrls, loadAttempt]);
+
+	const openSizeNumeric = selectedSolution?.open?.replace("x", "") || "2";
 
 	// Selecting a position that already acted rewinds to that decision.
 	const handleSelectPosition = (posId) => {
@@ -135,16 +233,90 @@ export default function RangeViewer({ allFiles = {} }) {
 	const rawVal = scenario?.strategy;
 
 	const { freq, comboFreq, allActions } = useMemo(
-		() => parseDetailedRange(rawVal),
-		[rawVal]
+		() => parseSolutionStrategy(currentRangesData, rawVal),
+		[currentRangesData, rawVal]
 	);
 	const referenceComboFreq = useMemo(
 		() =>
-			typeof scenario?.referenceRangeText === "string"
-				? parseDetailedRange(scenario.referenceRangeText).comboFreq
+			scenario?.referenceStrategy
+				? parseSolutionStrategy(
+						currentRangesData,
+						scenario.referenceStrategy
+					).comboFreq
 				: null,
-		[scenario]
+		[currentRangesData, scenario?.referenceStrategy]
 	);
+	const solutionModal = (
+		<SolutionModal
+			isOpen={isSolutionModalOpen}
+			onClose={() => setIsSolutionModalOpen(false)}
+			solutions={availableSolutions}
+			currentSolutionId={selectedSolution?.id}
+			onSelectSolution={(solution) => {
+				if (solution.id !== selectedSolutionKey) {
+					setLoadState({
+						solutionKey: solution.id,
+						attempt: loadAttempt,
+						urls: solutionUrls,
+						phase: "loading",
+						progress: 0,
+						parsedNodes: 0,
+						totalNodes: 0,
+						error: null,
+					});
+				}
+				setSelectedSolutionKey(solution.id);
+				setActivePosition(solution.rootPosition || "EP");
+				setActionPath([]);
+			}}
+		/>
+	);
+
+	if (!currentRangesData) {
+		const phase = loadStateMatchesSelection ? loadState.phase : "loading";
+		const error = loadStateMatchesSelection ? loadState.error : null;
+		const progress = loadStateMatchesSelection ? loadState.progress : 0;
+		const parsedNodes = loadStateMatchesSelection ? loadState.parsedNodes : 0;
+		const totalNodes = loadStateMatchesSelection ? loadState.totalNodes : 0;
+
+		return (
+			<div className="rv-container">
+				<section
+					className="rv-solution-loading"
+					role={phase === "error" ? "alert" : "status"}
+					aria-live="polite"
+				>
+					<h2>{selectedSolution?.title || "Loading solution"}</h2>
+					{phase === "error" ? (
+						<p>{error}</p>
+					) : phase === "parsing" ? (
+						<p>
+							Parsing ranges: {parsedNodes} of {totalNodes} nodes
+							{totalNodes > 0 ? ` (${progress}%)` : ""}
+						</p>
+					) : (
+						<p>Loading the selected solution file...</p>
+					)}
+					{phase !== "error" && (
+						<progress
+							aria-label="Loading selected solution"
+							max="100"
+							value={phase === "parsing" ? progress : undefined}
+						/>
+					)}
+					{phase === "error" && (
+						<button onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+							Retry
+						</button>
+					)}
+					<button onClick={() => setIsSolutionModalOpen(true)}>
+						Choose solution
+					</button>
+				</section>
+				{solutionModal}
+			</div>
+		);
+	}
 
 	return (
 		<div className="rv-container">
@@ -195,6 +367,7 @@ export default function RangeViewer({ allFiles = {} }) {
 								onSelectHand={setSelectedHand}
 								comboFreq={comboFreq}
 								referenceComboFreq={referenceComboFreq}
+								referenceAction={scenario?.referenceAction}
 								className="rv-range-grid"
 							/>
 						</div>
@@ -219,17 +392,7 @@ export default function RangeViewer({ allFiles = {} }) {
 			<TreeValidation solutionData={currentRangesData} />
 
 			{/* Solution Selection Modal */}
-			<SolutionModal
-				isOpen={isSolutionModalOpen}
-				onClose={() => setIsSolutionModalOpen(false)}
-				solutions={availableSolutions}
-				currentSolutionId={selectedSolution?.id}
-				onSelectSolution={(sol) => {
-					setSelectedSolutionKey(sol.fileKey || sol.id);
-					setActivePosition(sol.rootPosition || "EP");
-					setActionPath([]);
-				}}
-			/>
+			{solutionModal}
 		</div>
 	);
 }

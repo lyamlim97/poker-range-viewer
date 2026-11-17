@@ -8,6 +8,8 @@ export const POSITIONS_6MAX = [
 ];
 
 const POSITION_IDS = POSITIONS_6MAX.map(({ id }) => id);
+const nodeStrategyCache = new WeakMap();
+const EMPTY_STRATEGY = {};
 
 function getRootFoldHistory(solutionData) {
 	const rootNodeId = solutionData?.rootNodeId || solutionData?.tree?.root;
@@ -171,7 +173,7 @@ export function analyzeActionHistory(actionHistory = {}) {
 	};
 }
 
-function getSolutionNodes(solutionData) {
+export function getSolutionNodes(solutionData) {
 	const nodes = solutionData?.nodes || solutionData?.tree?.nodes;
 	if (Array.isArray(nodes)) {
 		return Object.fromEntries(nodes.filter((node) => node?.nodeId).map((node) => [node.nodeId, node]));
@@ -194,6 +196,24 @@ function getActionRange(action, node) {
 			? action.rawRangeText ?? node.strategy?.[label]
 			: node.strategy?.[label];
 	return typeof range === "string" ? range : null;
+}
+
+export function getSolutionNodeStrategy(node) {
+	if (nodeStrategyCache.has(node)) return nodeStrategyCache.get(node);
+
+	const strategy = Object.fromEntries(
+		getNodeActions(node)
+			.map((action) => {
+				const label = getActionLabel(action);
+				const range = getActionRange(action, node);
+				return typeof label === "string" && typeof range === "string"
+					? [label, range]
+					: null;
+			})
+			.filter(Boolean)
+	);
+	nodeStrategyCache.set(node, strategy);
+	return strategy;
 }
 
 function findNodeAction(node, action) {
@@ -239,14 +259,22 @@ function resolveTreeNode(solutionData, actionHistory, onTransition) {
 	return node;
 }
 
-function getPreviousActionRange(solutionData, actionHistory, position) {
-	let rangeText = null;
+function getPreviousActionReference(solutionData, actionHistory, position) {
+	let reference = null;
 	resolveTreeNode(solutionData, actionHistory, (node, event, action) => {
-		if (event.position === position) {
-			rangeText = getActionRange(action, node);
+		if (event.position === position && action) {
+			const label = getActionLabel(action);
+			if (typeof label !== "string") return;
+			const rangeText = getActionRange(action, node);
+			if (typeof rangeText === "string") {
+				reference = {
+					strategy: getSolutionNodeStrategy(node),
+					action: label,
+				};
+			}
 		}
 	});
-	return rangeText;
+	return reference;
 }
 
 function resolveSpot(solutionData, position, actionHistory) {
@@ -442,6 +470,10 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 	const node = resolveTreeNode(solutionData, actionHistory);
 	const strategyUnavailable = hasNoSavedStrategy(node);
 	const nodePosition = getNodePosition(node);
+	const previousActionReference =
+		node && nodePosition === position
+			? getPreviousActionReference(solutionData, actionHistory, position)
+			: null;
 	const spot = resolveSpot(solutionData, position, actionHistory);
 	const nodeActions = node ? getNodeActions(node).map(getActionLabel).filter(Boolean) : null;
 	const actions =
@@ -465,26 +497,14 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 		title: node?.title || spot?.title || defaultTitle,
 		terminal: node?.terminal === true,
 		tags: Array.isArray(node?.tags) ? node.tags : [],
-		referenceRangeText:
-			node && nodePosition === position
-				? getPreviousActionRange(solutionData, actionHistory, position)
-				: null,
+		referenceStrategy: previousActionReference?.strategy || null,
+		referenceAction: previousActionReference?.action || null,
 		actions: limitActionsToStack(actions, position, actionHistory),
 		strategy: strategyUnavailable
-			? {}
+			? EMPTY_STRATEGY
 			: node
-			? Object.fromEntries(
-					getNodeActions(node)
-						.map((action) => {
-							const label = getActionLabel(action);
-							const range = getActionRange(action, node);
-							return typeof label === "string" && typeof range === "string"
-								? [label, range]
-								: null;
-						})
-						.filter(Boolean)
-				)
-			: spot?.strategy || {},
+				? getSolutionNodeStrategy(node)
+				: spot?.strategy || EMPTY_STRATEGY,
 		path: path || `${position} > open`,
 		potSizeBB: computePotSizeBB(actionHistory),
 	};

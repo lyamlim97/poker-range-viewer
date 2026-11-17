@@ -1,11 +1,16 @@
 import { useState } from "react";
 import Viewer from "./Viewer";
 import RangeViewer from "./RangeViewer";
+import solutionIndex from "./data/solution-index.json";
 
 // Scenario tabs still use the legacy ranges files.
 const scenarioFiles = import.meta.glob("./data/ranges-*.json", { eager: true, import: "default" });
-// The range viewer should read from solution JSON files instead of the ranges-2x / ranges-2p5x files.
-const viewerFiles = import.meta.glob("./data/solutions/*.json", { eager: true, import: "default" });
+// Keep solution JSON as assets so only the selected file is fetched and parsed.
+const solutionUrls = import.meta.glob("./data/solutions/*.json", {
+	eager: true,
+	query: "?url",
+	import: "default",
+});
 
 const ORDER = ["2x", "2p5x", "3x"];
 const rank = (label) => (ORDER.includes(label) ? ORDER.indexOf(label) : ORDER.length);
@@ -66,7 +71,7 @@ export default function App() {
 			)}
 
 			{mode === "range-viewer" && (
-				<RangeViewer allFiles={viewerFiles} />
+				<RangeViewer solutionIndex={solutionIndex} solutionUrls={solutionUrls} />
 			)}
 		</>
 	);

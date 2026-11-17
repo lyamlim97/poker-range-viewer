@@ -18,7 +18,12 @@ export function checkHand(actions) {
 	return { total, status };
 }
 
-export function checkHandAgainstRange(hand, actionsByCombo, referenceByCombo) {
+export function checkHandAgainstRange(
+	hand,
+	actionsByCombo,
+	referenceByCombo,
+	referenceAction
+) {
 	const combos = getCombosForHand(hand);
 	let total = 0;
 	let expected = 0;
@@ -30,10 +35,13 @@ export function checkHandAgainstRange(hand, actionsByCombo, referenceByCombo) {
 			(sum, frequency) => sum + frequency,
 			0
 		);
-		const referenceTotal = Object.values(referenceByCombo[id] || {}).reduce(
-			(sum, frequency) => sum + frequency,
-			0
-		);
+		const referenceActions = referenceByCombo[id] || {};
+		const referenceTotal = referenceAction
+			? referenceActions[referenceAction] || 0
+			: Object.values(referenceActions).reduce(
+					(sum, frequency) => sum + frequency,
+					0
+				);
 
 		total += comboTotal;
 		expected += referenceTotal;

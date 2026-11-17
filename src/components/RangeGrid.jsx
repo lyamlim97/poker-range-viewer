@@ -25,6 +25,7 @@ function Cell({
 	actions = {},
 	comboFreq = {},
 	referenceComboFreq,
+	referenceAction,
 	isSelected = false,
 	onHover,
 	onSelect,
@@ -38,7 +39,7 @@ function Cell({
 
 	// Compare against the prior action range when one is available.
 	const { total, expected, status } = referenceComboFreq
-		? checkHandAgainstRange(hand, comboFreq, referenceComboFreq)
+		? checkHandAgainstRange(hand, comboFreq, referenceComboFreq, referenceAction)
 		: checkHand(actions);
 
 	const tip = (entries.length > 0
@@ -85,6 +86,7 @@ export default function RangeGrid({
 	onSelectHand,
 	comboFreq = {},
 	referenceComboFreq,
+	referenceAction,
 	className = "",
 }) {
 	const cells = [];
@@ -98,6 +100,7 @@ export default function RangeGrid({
 					actions={freq[hand] || {}}
 					comboFreq={comboFreq}
 					referenceComboFreq={referenceComboFreq}
+					referenceAction={referenceAction}
 					isSelected={selectedHand === hand}
 					onHover={onHoverHand}
 					onSelect={onSelectHand}
