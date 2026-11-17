@@ -132,6 +132,8 @@ export function getActionablePositions(actionHistory = {}, solutionData = null) 
 
 export function getNextPosition(actionHistory = {}, solutionData = null) {
 	const node = resolveTreeNode(solutionData, actionHistory);
+	if (node?.terminal === true || hasNoSavedStrategy(node)) return null;
+
 	const nodePosition = getNodePosition(node);
 	if (nodePosition) return nodePosition;
 
@@ -140,7 +142,6 @@ export function getNextPosition(actionHistory = {}, solutionData = null) {
 
 	const { pending, folded, allIn } = getHandState(path);
 	const lastIndex = POSITION_IDS.indexOf(path[path.length - 1].position);
-	if (node?.terminal === true || hasNoSavedStrategy(node)) return null;
 	for (let offset = 1; offset <= POSITION_IDS.length; offset++) {
 		const candidate = POSITION_IDS[(lastIndex + offset) % POSITION_IDS.length];
 		if (pending.has(candidate) && !folded.has(candidate) && !allIn.has(candidate)) {
