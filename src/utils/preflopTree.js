@@ -140,6 +140,7 @@ export function getNextPosition(actionHistory = {}, solutionData = null) {
 
 	const { pending, folded, allIn } = getHandState(path);
 	const lastIndex = POSITION_IDS.indexOf(path[path.length - 1].position);
+	if (node?.terminal === true || hasNoSavedStrategy(node)) return null;
 	for (let offset = 1; offset <= POSITION_IDS.length; offset++) {
 		const candidate = POSITION_IDS[(lastIndex + offset) % POSITION_IDS.length];
 		if (pending.has(candidate) && !folded.has(candidate) && !allIn.has(candidate)) {
@@ -217,6 +218,10 @@ function resolveTreeNode(solutionData, actionHistory, onTransition) {
 			(typeof option === "object" ? option.nextNodeId : null) ??
 			node.next?.[event.action] ??
 			node.children?.[event.action];
+		if (typeof option === "object" && option?.terminal === true) {
+			node = { terminal: true, actions: [] };
+			continue;
+		}
 		if (!nextId) return null;
 		node = typeof nextId === "string" ? nodes[nextId] : nextId;
 		if (!node) return null;

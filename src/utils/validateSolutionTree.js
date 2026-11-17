@@ -107,6 +107,7 @@ export function validateSolutionTree(solutionData = {}) {
 	const outgoingReferenceNodeIds = new Set();
 	const incompleteNodeIds = new Set();
 	const invalidEndpointNodeIds = new Set();
+	const terminalActionsWithLinks = new Set();
 
 	function addTarget(sourceNodeId, target) {
 		if (typeof target !== "string" || !target.trim()) {
@@ -161,10 +162,22 @@ export function validateSolutionTree(solutionData = {}) {
 		for (const action of actions) {
 			const directTarget =
 				action && typeof action === "object" ? action.nextNodeId : null;
+			const isTerminalAction =
+				action && typeof action === "object" && action.terminal === true;
 			const mappedTarget = getMappedTarget(node, action);
 			const target = directTarget ?? mappedTarget;
 
-			if (!isEndpoint && !(typeof directTarget === "string" && directTarget.trim())) {
+			if (
+				isTerminalAction &&
+				(directTarget != null || mappedTarget != null)
+			) {
+				terminalActionsWithLinks.add(nodeId);
+			}
+			if (
+				!isEndpoint &&
+				!isTerminalAction &&
+				!(typeof directTarget === "string" && directTarget.trim())
+			) {
 				actionsWithoutNextNode.set(
 					nodeId,
 					(actionsWithoutNextNode.get(nodeId) || 0) + 1
@@ -248,6 +261,7 @@ export function validateSolutionTree(solutionData = {}) {
 		unreachableNodeIds.length +
 		cycles.length +
 		invalidEndpointNodeIds.size +
+		terminalActionsWithLinks.size +
 		incompleteNodeIds.size +
 		invalidNodeIds.size;
 
@@ -258,6 +272,7 @@ export function validateSolutionTree(solutionData = {}) {
 		unreachableNodeIds,
 		cycles,
 		invalidEndpointNodeIds: [...invalidEndpointNodeIds],
+		terminalActionsWithLinks: [...terminalActionsWithLinks],
 		incompleteNodeIds: [...incompleteNodeIds],
 		invalidNodeIds: [...invalidNodeIds],
 		issueCount,

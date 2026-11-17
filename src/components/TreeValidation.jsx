@@ -30,6 +30,10 @@ export default function TreeValidation({ solutionData }) {
 			items: report.invalidEndpointNodeIds,
 		},
 		{
+			title: `Terminal actions with links (${report.terminalActionsWithLinks.length})`,
+			items: report.terminalActionsWithLinks,
+		},
+		{
 			title: `Unfinished decision nodes (${report.incompleteNodeIds.length})`,
 			items: report.incompleteNodeIds,
 		},
