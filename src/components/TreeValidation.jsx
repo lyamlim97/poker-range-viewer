@@ -45,6 +45,13 @@ export default function TreeValidation({ solutionData }) {
 			items: report.misplacedRareNodeTags,
 		},
 		{
+			title: `Node ID / position mismatches (${report.positionMismatches.length})`,
+			items: report.positionMismatches.map(
+				({ nodeId, idPosition, declaredPosition }) =>
+					`${nodeId} (ID ends in ${idPosition}; position is ${declaredPosition})`
+			),
+		},
+		{
 			title: `Unfinished decision nodes (${report.incompleteNodeIds.length})`,
 			items: report.incompleteNodeIds,
 		},

@@ -180,6 +180,7 @@ export function validateSolutionTree(solutionData = {}) {
 	const nodes = new Map();
 	const invalidNodeIds = new Set();
 	const duplicateNodeIds = new Set();
+	const positionMismatches = [];
 
 	for (const entry of entries) {
 		const nodeId = typeof entry.key === "string" ? entry.key : "";
@@ -202,9 +203,11 @@ export function validateSolutionTree(solutionData = {}) {
 			const isEndpoint = entry.node.terminal === true;
 			const hasIdPosition = POSITION_IDS.has(idPosition);
 			const hasDeclaredPosition = POSITION_IDS.has(declaredPosition);
+			if (hasIdPosition && hasDeclaredPosition && idPosition !== declaredPosition) {
+				positionMismatches.push({ nodeId, idPosition, declaredPosition });
+			}
 			if (
 				(declaredPosition != null && !hasDeclaredPosition) ||
-				(hasIdPosition && hasDeclaredPosition && idPosition !== declaredPosition) ||
 				(!hasIdPosition && !hasDeclaredPosition && !isEndpoint)
 			) {
 				invalidNodeIds.add(nodeId);
@@ -406,6 +409,7 @@ export function validateSolutionTree(solutionData = {}) {
 		invalidEndpointNodeIds.size +
 		outcomeActionsWithLinks.size +
 		misplacedRareNodeTags.size +
+		positionMismatches.length +
 		incompleteNodeIds.size +
 		invalidNodeIds.size;
 
@@ -419,6 +423,7 @@ export function validateSolutionTree(solutionData = {}) {
 		invalidEndpointNodeIds: [...invalidEndpointNodeIds],
 		outcomeActionsWithLinks: [...outcomeActionsWithLinks],
 		misplacedRareNodeTags: [...misplacedRareNodeTags],
+		positionMismatches,
 		incompleteNodeIds: [...incompleteNodeIds],
 		invalidNodeIds: [...invalidNodeIds],
 		issueCount,
