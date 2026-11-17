@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import RangeGrid from "./components/RangeGrid";
 import ActionSummary from "./components/ActionSummary";
 import HandDetail from "./components/HandDetail";
@@ -12,6 +12,7 @@ import {
 	getNextPosition,
 	getSolutionNodes,
 	getSolutionNodeStrategy,
+	isActionPathValid,
 	resolveSpotFromSolution,
 } from "./utils/preflopTree";
 import "./App.css";
@@ -61,6 +62,7 @@ export default function RangeViewer({
 	);
 	const [actionPath, setActionPath] = useState([]);
 	const [selectedHand, setSelectedHand] = useState("AA");
+	const reloadSnapshotRef = useRef(null);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -78,7 +80,10 @@ export default function RangeViewer({
 					);
 				}
 
-				const response = await fetch(assetUrl, { signal: controller.signal });
+				const response = await fetch(assetUrl, {
+					cache: "no-cache",
+					signal: controller.signal,
+				});
 				if (!response.ok) {
 					throw new Error(`The solution file could not be loaded (HTTP ${response.status}).`);
 				}
@@ -128,12 +133,29 @@ export default function RangeViewer({
 				}
 
 				if (cancelled) return;
-				setActivePosition(
+				const rootPosition =
 					getNextPosition([], solutionData) ||
-						selectedSolution?.rootPosition ||
-						"EP"
-				);
-				setActionPath([]);
+					selectedSolution?.rootPosition ||
+					"EP";
+				const reloadSnapshot = reloadSnapshotRef.current;
+				const canRestorePath =
+					reloadSnapshot?.solutionKey === solutionKey &&
+					reloadSnapshot.actionPath.length > 0 &&
+					isActionPathValid(
+						reloadSnapshot.actionPath,
+						solutionData
+					) &&
+					getNextPosition(reloadSnapshot.actionPath, solutionData) ===
+						reloadSnapshot.nextPosition;
+
+				if (canRestorePath) {
+					setActivePosition(reloadSnapshot.activePosition);
+					setActionPath(reloadSnapshot.actionPath);
+				} else {
+					setActivePosition(rootPosition);
+					setActionPath([]);
+				}
+				reloadSnapshotRef.current = null;
 				setLoadState({
 					solutionKey,
 					attempt: loadAttempt,
@@ -168,6 +190,26 @@ export default function RangeViewer({
 	}, [selectedSolution, selectedSolutionKey, solutionUrls, loadAttempt]);
 
 	const openSizeNumeric = selectedSolution?.open?.replace("x", "") || "2";
+	const handleReloadSolution = () => {
+		const nextAttempt = loadAttempt + 1;
+		reloadSnapshotRef.current = {
+			solutionKey: selectedSolutionKey,
+			actionPath: actionPath.map((event) => ({ ...event })),
+			activePosition,
+			nextPosition: getNextPosition(actionPath, currentRangesData),
+		};
+		setLoadState({
+			solutionKey: selectedSolutionKey,
+			attempt: nextAttempt,
+			urls: solutionUrls,
+			phase: "loading",
+			progress: 0,
+			parsedNodes: 0,
+			totalNodes: 0,
+			error: null,
+		});
+		setLoadAttempt(nextAttempt);
+	};
 
 	// Selecting a position that already acted rewinds to that decision.
 	const handleSelectPosition = (posId) => {
@@ -252,6 +294,7 @@ export default function RangeViewer({
 			solutions={availableSolutions}
 			currentSolutionId={selectedSolution?.id}
 			onSelectSolution={(solution) => {
+				reloadSnapshotRef.current = null;
 				if (solution.id !== selectedSolutionKey) {
 					setLoadState({
 						solutionKey: solution.id,
@@ -336,6 +379,7 @@ export default function RangeViewer({
 				isTerminal={scenario?.terminal}
 				isStrategyUnavailable={hasUnsavedRareStrategy}
 				onChangeSolution={() => setIsSolutionModalOpen(true)}
+				onReloadSolution={handleReloadSolution}
 				openSize={openSizeNumeric}
 				solutionData={currentRangesData}
 			/>

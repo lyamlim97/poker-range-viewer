@@ -599,6 +599,7 @@ button.flagged::after {
 	display: flex;
 	align-items: center;
 	flex-shrink: 0;
+	gap: 6px;
 }
 
 .rv-change-btn {

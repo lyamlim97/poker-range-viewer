@@ -73,6 +73,7 @@ export default function PreflopNav({
 	actionablePositions = [],
 	onSelectAction,
 	onChangeSolution,
+	onReloadSolution,
 	openSize = "2",
 	solutionData,
 	isTerminal = false,
@@ -131,6 +132,14 @@ export default function PreflopNav({
 				<div className="rv-sol-actions">
 					<button className="rv-change-btn" onClick={onChangeSolution}>
 						<span className="rv-gear-icon" aria-hidden="true">⚙</span> Change
+					</button>
+					<button
+						className="rv-change-btn"
+						onClick={onReloadSolution}
+						aria-label="Reload selected solution"
+						title="Reload selected solution JSON"
+					>
+						<span aria-hidden="true">↻</span> Reload
 					</button>
 				</div>
 			</div>

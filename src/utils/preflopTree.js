@@ -259,6 +259,20 @@ function resolveTreeNode(solutionData, actionHistory, onTransition) {
 	return node;
 }
 
+export function isActionPathValid(actionHistory, solutionData) {
+	try {
+		const node = resolveTreeNode(solutionData, actionHistory);
+		if (!node) return false;
+		getNodePosition(node);
+		return true;
+	} catch (error) {
+		if (error instanceof Error && error.message.startsWith("Solution node ")) {
+			return false;
+		}
+		throw error;
+	}
+}
+
 function getPreviousActionReference(solutionData, actionHistory, position) {
 	let reference = null;
 	resolveTreeNode(solutionData, actionHistory, (node, event, action) => {
