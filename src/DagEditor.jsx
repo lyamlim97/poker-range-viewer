@@ -452,6 +452,45 @@ export default function DagEditor({
 		);
 	}
 
+	function deleteSelectedActionRange() {
+		if (selectedActionIndex < 0) return;
+		const label = getActionLabel(selectedAction);
+		if (
+			!window.confirm(
+				`Delete the saved range for "${label}" on node "${selectedNodeId}"?`
+			)
+		) {
+			return;
+		}
+
+		updateSolution((current) =>
+			updateNode(current, selectedNodeId, (node) => {
+				const actions = [...(Array.isArray(node.actions) ? node.actions : [])];
+				const currentAction = actions[selectedActionIndex];
+				const updatedAction =
+					typeof currentAction === "object" && currentAction
+						? { ...currentAction }
+						: currentAction;
+				if (typeof updatedAction === "object" && updatedAction) {
+					delete updatedAction.rawRangeText;
+				}
+				actions[selectedActionIndex] = updatedAction;
+
+				const nextNode = { ...node, actions };
+				if (node.strategy && typeof node.strategy === "object") {
+					const strategy = { ...node.strategy };
+					delete strategy[label];
+					if (Object.keys(strategy).length > 0) {
+						nextNode.strategy = strategy;
+					} else {
+						delete nextNode.strategy;
+					}
+				}
+				return nextNode;
+			})
+		);
+	}
+
 	function updateSelectedActionOutcome(outcome, targetNodeId = "") {
 		if (selectedActionIndex < 0) return;
 		const expected =
@@ -660,6 +699,68 @@ export default function DagEditor({
 		deleteNode(selectedNodeId);
 	}
 
+	function deleteAction(nodeId, actionKey) {
+		if (!nodeId || !actionKey) return;
+		const node = solution?.nodes?.[nodeId];
+		const actions = Array.isArray(node?.actions) ? node.actions : [];
+		const actionIndex = actions.findIndex(
+			(action, index) => getActionKey(action, index) === actionKey
+		);
+		if (actionIndex < 0) return;
+		const action = actions[actionIndex];
+		const label = getActionLabel(action);
+		if (
+			!window.confirm(
+				`Delete action "${label}" and its range from node "${nodeId}"?`
+			)
+		) {
+			return;
+		}
+
+		updateSolution((current) =>
+			updateNode(current, nodeId, (currentNode) => {
+				const currentActions = Array.isArray(currentNode.actions)
+					? [...currentNode.actions]
+					: [];
+				const currentIndex = currentActions.findIndex(
+					(item, index) => getActionKey(item, index) === actionKey
+				);
+				if (currentIndex < 0) return currentNode;
+				const removedAction = currentActions[currentIndex];
+				const removedLabel = getActionLabel(removedAction);
+				currentActions.splice(currentIndex, 1);
+
+				const nextNode = { ...currentNode, actions: currentActions };
+				if (currentNode.strategy && typeof currentNode.strategy === "object") {
+					const strategy = { ...currentNode.strategy };
+					delete strategy[removedLabel];
+					if (Object.keys(strategy).length > 0) {
+						nextNode.strategy = strategy;
+					} else {
+						delete nextNode.strategy;
+					}
+				}
+				return nextNode;
+			})
+		);
+
+		if (selectedNodeId === nodeId) {
+			const remaining = actions.filter(
+				(_, index) => index !== actionIndex
+			);
+			const nextAction =
+				remaining[actionIndex] || remaining[actionIndex - 1] || null;
+			setSelectedActionKey(
+				nextAction
+					? getActionKey(
+							nextAction,
+							remaining.findIndex((item) => item === nextAction)
+						)
+					: ""
+			);
+		}
+	}
+
 	function handleReload() {
 		if (
 			isDirty &&
@@ -861,6 +962,7 @@ export default function DagEditor({
 						layoutKey={selectedSolutionId}
 						selectedNodeId={selectedNodeId}
 						selectedActionKey={selectedActionKey}
+						canDeleteActions={canWriteFiles}
 						problemNodeIds={problemNodeIds}
 						nodeIssues={validationReport?.nodeIssues || {}}
 						onSelectNode={selectNode}
@@ -875,6 +977,9 @@ export default function DagEditor({
 						}}
 						onDeleteNode={(nodeId) => {
 							deleteNode(nodeId);
+						}}
+						onDeleteAction={(nodeId, actionKey) => {
+							deleteAction(nodeId, actionKey);
 						}}
 					/>
 
@@ -980,61 +1085,85 @@ export default function DagEditor({
 													!(typeof target === "string" && target.trim());
 												const selected = key === selectedActionKey;
 												return (
-													<button
+													<div
 														key={key}
-														type="button"
 														className={
 															selected
-																? "range-editor-action active"
-																: "range-editor-action"
+																? "range-editor-action-item active"
+																: "range-editor-action-item"
 														}
-														onClick={() => setSelectedActionKey(key)}
 													>
-														<span className="range-editor-action-top">
-															<strong>{label}</strong>
-															<span className="range-editor-action-badges">
-																{missingNextNode && (
+														<button
+															type="button"
+															className="range-editor-action"
+															onClick={() => setSelectedActionKey(key)}
+														>
+															<span className="range-editor-action-top">
+																<strong>{label}</strong>
+																<span className="range-editor-action-badges">
+																	{missingNextNode && (
+																		<span
+																			className="range-editor-action-badge warning"
+																			title="This range has no nextNodeId"
+																		>
+																			⚠ No next node
+																		</span>
+																	)}
+																	{isTerminalAction && (
+																		<span className="range-editor-action-badge terminal">
+																			Terminal
+																		</span>
+																	)}
+																	{isRareAction && (
+																		<span className="range-editor-action-badge rare">
+																			Almost never reached
+																		</span>
+																	)}
 																	<span
-																		className="range-editor-action-badge warning"
-																		title="This range has no nextNodeId"
+																		className={`range-editor-range-pill ${getRangeClass(getRangeStatus(action, selectedNode))}`}
 																	>
-																		⚠ No next node
+																		{getRangeStatus(action, selectedNode)}
 																	</span>
-																)}
-																{isTerminalAction && (
-																	<span className="range-editor-action-badge terminal">
-																		Terminal
-																	</span>
-																)}
-																{isRareAction && (
-																	<span className="range-editor-action-badge rare">
-																		Almost never reached
-																	</span>
-																)}
-																<span
-																	className={`range-editor-range-pill ${getRangeClass(getRangeStatus(action, selectedNode))}`}
-																>
-																	{getRangeStatus(action, selectedNode)}
 																</span>
 															</span>
-														</span>
-														<span className="range-editor-action-bottom">
-															{typeof target === "string" && target
-																? `Next: ${target}`
-																: action &&
-																typeof action === "object" &&
-																		action.terminal
-																	? "Ends the hand"
+															<span className="range-editor-action-bottom">
+																{typeof target === "string" && target
+																	? `Next: ${target}`
 																	: action &&
 																	typeof action === "object" &&
-																			Array.isArray(action.tags) &&
-																			action.tags.includes(
-																				"almost-never-reached"
-																		)
-																		? "Almost never reached"
-																		: "No next node linked"}
-														</span>
-													</button>
+																			action.terminal
+																		? "Ends the hand"
+																		: action &&
+																		typeof action === "object" &&
+																				Array.isArray(action.tags) &&
+																				action.tags.includes(
+																					"almost-never-reached"
+																			)
+																			? "Almost never reached"
+																			: "No next node linked"}
+															</span>
+														</button>
+														<button
+															type="button"
+															className="range-editor-action-delete"
+															onClick={() => deleteAction(selectedNodeId, key)}
+															disabled={!canWriteFiles}
+															aria-label={`Delete ${label} action`}
+															title={`Delete ${label} action and range`}
+														>
+															<svg
+																className="range-editor-button-icon"
+																viewBox="0 0 24 24"
+																aria-hidden="true"
+															>
+																<path d="M3 6h18" />
+																<path d="M8 6V4h8v2" />
+																<path d="M19 6l-1 14H6L5 6" />
+																<path d="M10 10v6M14 10v6" />
+															</svg>
+															<span>Delete</span>
+														</button>
+													</div>
 												);
 											})}
 										</div>
@@ -1062,11 +1191,33 @@ export default function DagEditor({
 												<div className="range-editor-eyebrow">Selected action</div>
 												<h3>{getActionLabel(selectedAction)}</h3>
 											</div>
-											<span
-														className={`range-editor-range-pill ${getRangeClass(getRangeStatus(selectedAction, selectedNode))}`}
-											>
-												{getRangeStatus(selectedAction, selectedNode)}
-											</span>
+											<div className="range-editor-card-heading-actions">
+												<span
+													className={`range-editor-range-pill ${getRangeClass(getRangeStatus(selectedAction, selectedNode))}`}
+												>
+													{getRangeStatus(selectedAction, selectedNode)}
+												</span>
+												<button
+													type="button"
+													className="range-editor-danger range-editor-delete-action"
+													onClick={() =>
+														deleteAction(selectedNodeId, getActionKey(selectedAction, selectedActionIndex))
+													}
+													disabled={!canWriteFiles}
+												>
+													<svg
+														className="range-editor-button-icon"
+														viewBox="0 0 24 24"
+														aria-hidden="true"
+													>
+														<path d="M3 6h18" />
+														<path d="M8 6V4h8v2" />
+														<path d="M19 6l-1 14H6L5 6" />
+														<path d="M10 10v6M14 10v6" />
+													</svg>
+													<span>Delete action</span>
+												</button>
+											</div>
 										</div>
 										<label
 											className="range-editor-field-label"
@@ -1112,6 +1263,16 @@ export default function DagEditor({
 													disabled={!canWriteFiles}
 												>
 													Mark empty range
+												</button>
+											)}
+											{selectedRange !== null && (
+												<button
+													type="button"
+													className="range-editor-secondary range-editor-delete-range"
+													onClick={deleteSelectedActionRange}
+													disabled={!canWriteFiles}
+												>
+													Delete range
 												</button>
 											)}
 										</div>

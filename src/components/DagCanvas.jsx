@@ -28,12 +28,14 @@ export default function DagCanvas({
 	layoutKey,
 	selectedNodeId,
 	selectedActionKey,
+	canDeleteActions = false,
 	problemNodeIds = new Set(),
 	nodeIssues = {},
 	onSelectNode,
 	onSelectAction,
 	onAddAction,
 	onDeleteNode,
+	onDeleteAction,
 }) {
 	const storageKey = `dag-positions:${layoutKey}`;
 	const containerRef = useRef(null);
@@ -87,7 +89,7 @@ export default function DagCanvas({
 		fitView();
 		// Fit once when a solution is first shown; later edits must not move the camera.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [nodeIds]);
+	}, []);
 
 	useEffect(() => {
 		const container = containerRef.current;
@@ -375,45 +377,59 @@ export default function DagCanvas({
 											!isRareAction &&
 											!(typeof target === "string" && target.trim());
 										return (
-											<button
+											<div
 												key={key}
-												type="button"
 												className={
 													id === selectedNodeId && key === selectedActionKey
-														? "dag-action active"
-														: "dag-action"
+														? "dag-action-row active"
+														: "dag-action-row"
 												}
-												title={`${status}${target ? ` → ${target}` : ""}`}
-												onClick={() => onSelectAction(id, key)}
 											>
-												<span className={`dag-dot ${getRangeClass(status)}`} />
-												<span className="dag-action-label">{getActionLabel(action)}</span>
-												{missingNextNode && (
-													<span
-														className="dag-action-badge warning"
-														title="This range has no nextNodeId"
-													>
-														!
-													</span>
-												)}
-												{isTerminalAction && (
-													<span
-														className="dag-action-badge terminal"
-														title="Terminal action"
-													>
-														T
-													</span>
-												)}
-												{isRareAction && (
-													<span
-														className="dag-action-badge rare"
-														title="Almost never reached"
-													>
-														Rare
-													</span>
-												)}
-												{target && <span className="dag-port" />}
-											</button>
+												<button
+													type="button"
+													className="dag-action"
+													title={`${status}${target ? ` → ${target}` : ""}`}
+													onClick={() => onSelectAction(id, key)}
+												>
+													<span className={`dag-dot ${getRangeClass(status)}`} />
+													<span className="dag-action-label">{getActionLabel(action)}</span>
+													{missingNextNode && (
+														<span
+															className="dag-action-badge warning"
+															title="This range has no nextNodeId"
+														>
+															!
+														</span>
+													)}
+													{isTerminalAction && (
+														<span
+															className="dag-action-badge terminal"
+															title="Terminal action"
+														>
+															T
+														</span>
+													)}
+													{isRareAction && (
+														<span
+															className="dag-action-badge rare"
+															title="Almost never reached"
+														>
+															Rare
+														</span>
+													)}
+													{target && <span className="dag-port" />}
+												</button>
+												<button
+													type="button"
+													className="dag-action-delete"
+													onClick={() => onDeleteAction?.(id, key)}
+													disabled={!canDeleteActions}
+													aria-label={`Delete ${getActionLabel(action)} action`}
+													title={`Delete ${getActionLabel(action)} action and range`}
+												>
+													×
+												</button>
+											</div>
 										);
 									})}
 								</div>
