@@ -21,6 +21,10 @@ export default function TreeValidation({ solutionData }) {
 			),
 		},
 		{
+			title: `Actions without rawRangeText (${report.actionsWithoutRange.length})`,
+			items: report.actionsWithoutRange,
+		},
+		{
 			title: `Actions without nextNodeId (${report.actionsWithoutNextNodeCount})`,
 			items: report.actionsWithoutNextNode,
 		},
@@ -76,9 +80,10 @@ export default function TreeValidation({ solutionData }) {
 				</span>
 			</div>
 			<p className="rv-tree-validation-description">
-				Each non-terminal action link must match its expected next node, and
-				branches without a next node must end at a terminal action or an
-				almost-never-reached action.
+				Every action must have a rawRangeText string (an empty string is allowed
+				for an intentionally empty range). Continuing action links must match
+				their expected next node, and branches without a next node must end at a
+				terminal or almost-never-reached action.
 			</p>
 			{groups.length === 0 ? (
 				<p className="rv-tree-validation-empty">No structural issues found.</p>

@@ -107,7 +107,7 @@ function getActionToken(action, history) {
 	return null;
 }
 
-function getExpectedNextNodeId(sourceNodeId, action) {
+export function getExpectedNextNodeId(sourceNodeId, action) {
 	const parsedSource = parseNodeHistory(sourceNodeId);
 	if (!parsedSource) return null;
 
@@ -181,21 +181,68 @@ export function validateSolutionTree(solutionData = {}) {
 	const invalidNodeIds = new Set();
 	const duplicateNodeIds = new Set();
 	const positionMismatches = [];
+	const issues = [];
+	const nodeIssues = {};
+
+	if (!solutionData || typeof solutionData !== "object" || Array.isArray(solutionData)) {
+		addSolutionIssue("invalid-solution", "error", {
+			message: "Solution data must be a JSON object.",
+		});
+	}
+	if (!solutionData?.meta || typeof solutionData.meta !== "object" || Array.isArray(solutionData.meta)) {
+		addSolutionIssue("missing-meta", "error", {
+			message: "Solution metadata is missing or invalid.",
+		});
+	}
+	if (!solutionData?.nodes || typeof solutionData.nodes !== "object" || Array.isArray(solutionData.nodes)) {
+		addSolutionIssue("invalid-nodes", "error", {
+			message: "The solution nodes value must be an object.",
+		});
+	}
+
+	function addIssue(category, severity, nodeId, details = {}) {
+		const issue = {
+			category,
+			severity,
+			nodeId: nodeId ?? null,
+			...details,
+		};
+		issues.push(issue);
+		if (nodeId) {
+			if (!nodeIssues[nodeId]) nodeIssues[nodeId] = [];
+			nodeIssues[nodeId].push(issue);
+		}
+	}
+
+	function addSolutionIssue(category, severity, details = {}) {
+		addIssue(category, severity, null, details);
+	}
 
 	for (const entry of entries) {
 		const nodeId = typeof entry.key === "string" ? entry.key : "";
 		if (!nodeId) {
 			invalidNodeIds.add(entry.isArray ? `[nodes ${entry.index}]` : "(empty node key)");
+			addSolutionIssue("invalid-node-id", "error", {
+				message: "A node key is empty or invalid.",
+				nodeIndex: entry.index,
+			});
 			continue;
 		}
 		if (nodes.has(nodeId)) {
 			duplicateNodeIds.add(nodeId);
+			addIssue("duplicate-node-id", "error", nodeId, {
+				message: `Node ID "${nodeId}" appears more than once.`,
+			});
 			continue;
 		}
 
 		nodes.set(nodeId, entry.node);
 		if (!entry.isArray && entry.node?.nodeId !== nodeId) {
 			invalidNodeIds.add(`${nodeId} / ${entry.node?.nodeId || "(missing nodeId)"}`);
+			addIssue("node-id-mismatch", "error", nodeId, {
+				message: `Node object nodeId "${entry.node?.nodeId || "(missing)"}" does not match key "${nodeId}".`,
+				declaredNodeId: entry.node?.nodeId || null,
+			});
 		}
 		if (entry.node && typeof entry.node === "object") {
 			const idPosition = nodeId.split("_").pop();
@@ -205,13 +252,27 @@ export function validateSolutionTree(solutionData = {}) {
 			const hasDeclaredPosition = POSITION_IDS.has(declaredPosition);
 			if (hasIdPosition && hasDeclaredPosition && idPosition !== declaredPosition) {
 				positionMismatches.push({ nodeId, idPosition, declaredPosition });
+				addIssue("position-mismatch", "error", nodeId, {
+					message: `Node ID ends in ${idPosition}, but position is ${declaredPosition}.`,
+					idPosition,
+					declaredPosition,
+				});
 			}
 			if (
 				(declaredPosition != null && !hasDeclaredPosition) ||
 				(!hasIdPosition && !hasDeclaredPosition && !isEndpoint)
 			) {
 				invalidNodeIds.add(nodeId);
+				addIssue("invalid-node", "error", nodeId, {
+					message: "Node position or node ID position is invalid.",
+					declaredPosition: declaredPosition ?? null,
+				});
 			}
+		} else {
+			invalidNodeIds.add(nodeId);
+			addIssue("invalid-node", "error", nodeId, {
+				message: "Node value must be an object.",
+			});
 		}
 	}
 
@@ -222,6 +283,7 @@ export function validateSolutionTree(solutionData = {}) {
 	const rootNodeId = solutionData?.rootNodeId || solutionData?.tree?.root;
 	const missingTargets = [];
 	const missingTargetKeys = new Set();
+	const actionsWithoutRange = [];
 	const actionsWithoutNextNode = new Map();
 	const wronglyLinkedNodes = [];
 	const wronglyLinkedKeys = new Set();
@@ -240,6 +302,10 @@ export function validateSolutionTree(solutionData = {}) {
 				if (!missingTargetKeys.has(key)) {
 					missingTargetKeys.add(key);
 					missingTargets.push({ sourceNodeId, targetNodeId: targetLabel });
+					addIssue("missing-target", "error", sourceNodeId, {
+						message: `Action target "${targetLabel}" is missing or invalid.`,
+						targetNodeId: targetLabel,
+					});
 				}
 			}
 			return;
@@ -250,6 +316,10 @@ export function validateSolutionTree(solutionData = {}) {
 			if (!missingTargetKeys.has(key)) {
 				missingTargetKeys.add(key);
 				missingTargets.push({ sourceNodeId, targetNodeId: target });
+				addIssue("missing-target", "error", sourceNodeId, {
+					message: `Target node "${target}" does not exist.`,
+					targetNodeId: target,
+				});
 			}
 			return;
 		}
@@ -274,6 +344,12 @@ export function validateSolutionTree(solutionData = {}) {
 			targetNodeId,
 			expectedNodeId: expected.nodeId,
 		});
+		addIssue("wrong-target", "error", sourceNodeId, {
+			message: `Action "${actionLabel}" should lead to "${expected.nodeId}", not "${targetNodeId}".`,
+			action: actionLabel,
+			targetNodeId,
+			expectedNodeId: expected.nodeId,
+		});
 	}
 
 	if (typeof rootNodeId !== "string" || !nodes.has(rootNodeId)) {
@@ -282,6 +358,10 @@ export function validateSolutionTree(solutionData = {}) {
 				? rootNodeId
 				: "(missing rootNodeId)";
 		missingTargets.push({ sourceNodeId: "rootNodeId", targetNodeId });
+		addSolutionIssue("invalid-root", "error", {
+			message: `Root node "${targetNodeId}" does not exist.`,
+			targetNodeId,
+		});
 	}
 
 	for (const [nodeId, node] of nodes) {
@@ -292,15 +372,52 @@ export function validateSolutionTree(solutionData = {}) {
 
 		const actions = Array.isArray(node.actions) ? node.actions : [];
 		const isEndpoint = node.terminal === true;
-		if (isAlmostNeverReached(node)) misplacedRareNodeTags.add(nodeId);
+		if (isAlmostNeverReached(node)) {
+			misplacedRareNodeTags.add(nodeId);
+			addIssue("rare-node-tag", "error", nodeId, {
+				message: "The almost-never-reached tag belongs on an action, not a node.",
+			});
+		}
 
 		if (isEndpoint && actions.length > 0) {
 			invalidEndpointNodeIds.add(nodeId);
+			addIssue("terminal-with-actions", "error", nodeId, {
+				message: "Terminal nodes cannot contain actions.",
+			});
 		} else if (!isEndpoint && actions.length === 0) {
 			incompleteNodeIds.add(nodeId);
+			addIssue("incomplete-node", "warning", nodeId, {
+				message: "This node has no actions and is not marked terminal.",
+			});
 		}
 
 		for (const action of actions) {
+			if (
+				typeof action !== "string" &&
+				(!action || typeof action !== "object" || Array.isArray(action))
+			) {
+				addIssue("invalid-action", "error", nodeId, {
+					message: "Action must be a string or an object.",
+				});
+				continue;
+			}
+			const actionLabel = getActionKeys(action)[0] || "(unknown action)";
+			const strategyRange = getActionKeys(action)
+				.map((key) => node.strategy?.[key])
+				.find((rangeText) => typeof rangeText === "string");
+			const rangeText =
+				typeof action?.rawRangeText === "string"
+					? action.rawRangeText
+					: strategyRange;
+			if (typeof rangeText !== "string") {
+				actionsWithoutRange.push(`${nodeId} — ${actionLabel}`);
+				addIssue("missing-range", "warning", nodeId, {
+					message: `Action "${actionLabel}" has no range.`,
+					action: actionLabel,
+					actionId: typeof action?.id === "string" ? action.id : null,
+				});
+			}
+
 			const directTarget =
 				action && typeof action === "object" ? action.nextNodeId : null;
 			const isTerminalAction =
@@ -314,6 +431,10 @@ export function validateSolutionTree(solutionData = {}) {
 				(directTarget != null || mappedTarget != null)
 			) {
 				outcomeActionsWithLinks.add(nodeId);
+				addIssue("outcome-action-with-target", "error", nodeId, {
+					message: `Action "${actionLabel}" is terminal or rare but has a target.`,
+					action: actionLabel,
+				});
 			}
 			if (
 				!isEndpoint &&
@@ -325,6 +446,11 @@ export function validateSolutionTree(solutionData = {}) {
 					nodeId,
 					(actionsWithoutNextNode.get(nodeId) || 0) + 1
 				);
+				addIssue("missing-next-node", "warning", nodeId, {
+					message: `Action "${actionLabel}" has no nextNodeId.`,
+					action: actionLabel,
+					actionId: typeof action?.id === "string" ? action.id : null,
+				});
 			}
 			if (target != null) {
 				outgoingReferenceNodeIds.add(nodeId);
@@ -346,6 +472,9 @@ export function validateSolutionTree(solutionData = {}) {
 
 		if (isEndpoint && outgoingReferenceNodeIds.has(nodeId)) {
 			invalidEndpointNodeIds.add(nodeId);
+			addIssue("endpoint-with-outgoing-link", "error", nodeId, {
+				message: "Terminal nodes cannot have outgoing links.",
+			});
 		}
 	}
 
@@ -364,6 +493,11 @@ export function validateSolutionTree(solutionData = {}) {
 	const unreachableNodeIds = [...nodes.keys()].filter(
 		(nodeId) => !reachableNodeIds.has(nodeId)
 	);
+	for (const nodeId of unreachableNodeIds) {
+		addIssue("unreachable-node", "warning", nodeId, {
+			message: "This node cannot be reached from the root.",
+		});
+	}
 
 	const visitState = new Map();
 	const visitPath = [];
@@ -382,6 +516,12 @@ export function validateSolutionTree(solutionData = {}) {
 				if (!cycleKeys.has(key)) {
 					cycleKeys.add(key);
 					cycles.push(cycle);
+					for (const nodeId of cycle.slice(0, -1)) {
+						addIssue("cycle", "error", nodeId, {
+							message: `This node is part of a cycle: ${cycle.join(" -> ")}.`,
+							cycle,
+						});
+					}
 				}
 			} else if (!visitState.has(target)) {
 				visit(target);
@@ -400,21 +540,17 @@ export function validateSolutionTree(solutionData = {}) {
 		(total, count) => total + count,
 		0
 	);
-	const issueCount =
-		missingTargets.length +
-		actionsWithoutNextNodeCount +
-		wronglyLinkedNodes.length +
-		unreachableNodeIds.length +
-		cycles.length +
-		invalidEndpointNodeIds.size +
-		outcomeActionsWithLinks.size +
-		misplacedRareNodeTags.size +
-		positionMismatches.length +
-		incompleteNodeIds.size +
-		invalidNodeIds.size;
+	const issueCount = issues.length;
+	const nodeIssueCounts = Object.fromEntries(
+		Object.entries(nodeIssues).map(([nodeId, nodeIssueList]) => [
+			nodeId,
+			nodeIssueList.length,
+		])
+	);
 
 	return {
 		missingTargets,
+		actionsWithoutRange,
 		wronglyLinkedNodes,
 		actionsWithoutNextNode: [...actionsWithoutNextNode].map(([nodeId]) => nodeId),
 		actionsWithoutNextNodeCount,
@@ -427,5 +563,8 @@ export function validateSolutionTree(solutionData = {}) {
 		incompleteNodeIds: [...incompleteNodeIds],
 		invalidNodeIds: [...invalidNodeIds],
 		issueCount,
+		issues,
+		nodeIssues,
+		nodeIssueCounts,
 	};
 }

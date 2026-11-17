@@ -6,6 +6,7 @@ Poker Range Viewer is a browser app for exploring preflop poker ranges. It has t
 
 - **Scenarios** - browse and edit the preset ranges grouped by opening size.
 - **Range Viewer** - explore linked solution trees, action frequencies, and individual hand combos.
+- **Range DAG** - view the solution tree as a draggable graph, add actions with a **+ Add** button on any node, and paste their ranges into a selected solution file.
 
 ### Run locally
 
@@ -34,9 +35,19 @@ Select **Change** to choose a solution. Select an action in the tree to follow t
 
 When a position acts again later in the tree, the viewer checks that node's combined action frequencies against that position's most recent prior action range. For example, EP's later response is checked against EP's earlier raise range. Positions with no prior action range continue to be checked against 100%.
 
-The **Tree validation** section at the bottom checks missing node targets, actions without `nextNodeId`, unreachable nodes, cycles, invalid node IDs or positions, and branches that do not end at a terminal or almost-never-reached node. Every action must link to an explicit node, including folds that end at terminal nodes.
+The **Tree validation** section at the bottom checks actions without `rawRangeText`, missing node targets, actions without `nextNodeId`, unreachable nodes, cycles, invalid node IDs or positions, and branches that do not end at a terminal or almost-never-reached node. Continuing actions must link to an explicit node; terminal and almost-never-reached actions are endpoints and do not link to another decision.
 
-### Solution file structure
+## 4. Range DAG
+
+The **Range DAG** tab shows the selected solution as a directed graph: each node is a decision, each action row is an output port, and arrows lead to the next decision. Drag a node's header to move it, drag the background to pan, and scroll to zoom (**Fit** and **Auto layout** reset the view). Node positions are remembered per solution in the browser. Click a node or action to inspect it, or use **+ Add** on a node to add Fold, Call, Raise, 3-Bet, 4-Bet, 5-Bet, Squeeze, or All-in actions. A continuing action automatically creates and links its next decision node using the established path-style `NodeId` convention and next-position rules. Terminal and almost-never-reached outcomes do not create a decision node.
+
+Select an action to paste its range. The editor stores the pasted text unchanged as that action's `rawRangeText`. New actions start without a range; paste one or use **Mark empty range** when the action intentionally has no combos. The node list highlights actions still needing range text.
+
+Changes are autosaved to the selected `src/data/solutions/<id>.json` file after a short pause, but only when running the local Vite development server (`npm run dev`). The save endpoint writes only existing solution files. If the file changes outside the editor while it is open, autosave stops rather than overwriting the external edit; choose **Overwrite file** to keep the editor's version or **Reload from disk** to discard editor changes and load the external version. In the Range Viewer, use **Reload** to load the latest saved solution.
+
+The editor intentionally selects from existing solutions; add new solution files and their metadata to `src/data/solution-index.json` before editing them here, then restart the dev server so the asset list and save allowlist are refreshed.
+
+## 5. Solution file structure
 
 A solution has three top-level properties:
 
@@ -59,7 +70,7 @@ For example, this action puts the `AA` range on a raise and links it to the MP d
 
 When adding a branch, define its target node in `nodes` and ensure its `nodeId` matches the map key. Keep each action's range with that action; different actions at the same node have separate ranges.
 
-## 4. Other notes
+## 6. Other notes
 
 ### Node IDs and positions
 

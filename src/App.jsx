@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Viewer from "./Viewer";
 import RangeViewer from "./RangeViewer";
+import DagEditor from "./DagEditor";
 import solutionIndex from "./data/solution-index.json";
 
 // Scenario tabs still use the legacy ranges files.
@@ -25,7 +26,7 @@ const TABS = Object.entries(scenarioFiles)
 
 export default function App() {
 	const [active, setActive] = useState(0);
-	const [mode, setMode] = useState("scenarios"); // "scenarios" | "range-viewer"
+	const [mode, setMode] = useState("scenarios");
 
 	return (
 		<>
@@ -42,6 +43,12 @@ export default function App() {
 						onClick={() => setMode("range-viewer")}
 					>
 						Range Viewer
+					</button>
+					<button
+						className={mode === "range-dag" ? "mode-btn active" : "mode-btn"}
+						onClick={() => setMode("range-dag")}
+					>
+						Range DAG
 					</button>
 				</div>
 			</nav>
@@ -72,6 +79,9 @@ export default function App() {
 
 			{mode === "range-viewer" && (
 				<RangeViewer solutionIndex={solutionIndex} solutionUrls={solutionUrls} />
+			)}
+			{mode === "range-dag" && (
+				<DagEditor solutionIndex={solutionIndex} solutionUrls={solutionUrls} />
 			)}
 		</>
 	);
