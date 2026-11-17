@@ -758,7 +758,15 @@ export default function DagEditor({
 							onClick={handleReload}
 							title="Reload the solution from disk"
 						>
-							↻ Reload
+							<svg
+								className="range-editor-button-icon"
+								viewBox="0 0 24 24"
+								aria-hidden="true"
+							>
+								<path d="M20 6v5h-5" />
+								<path d="M19 11a7.5 7.5 0 1 1-2.2-5.3L20 8" />
+							</svg>
+							<span>Reload</span>
 						</button>
 					)}
 					<div className={`range-editor-save-status ${saveStatusClass}`} role="status">
@@ -912,7 +920,17 @@ export default function DagEditor({
 													: "Delete this node"
 											}
 										>
-											Delete node
+											<svg
+												className="range-editor-button-icon"
+												viewBox="0 0 24 24"
+												aria-hidden="true"
+											>
+												<path d="M3 6h18" />
+												<path d="M8 6V4h8v2" />
+												<path d="M19 6l-1 14H6L5 6" />
+												<path d="M10 10v6M14 10v6" />
+											</svg>
+											<span>Delete node</span>
 										</button>
 									</div>
 									<code className="range-editor-node-path">{selectedNodeId}</code>
@@ -1180,13 +1198,21 @@ export default function DagEditor({
 														solution.nodes[selectedActionTarget] && (
 															<button
 																type="button"
-																className="range-editor-secondary"
+																className="range-editor-open-target"
 																onClick={() => {
 																	setSelectedNodeId(selectedActionTarget);
 																	setSelectedActionKey("");
 																}}
 															>
-																Open target node
+																<span>Open target node</span>
+																<svg
+																	className="range-editor-button-icon"
+																	viewBox="0 0 24 24"
+																	aria-hidden="true"
+																>
+																	<path d="M5 12h14" />
+																	<path d="m13 6 6 6-6 6" />
+																</svg>
 															</button>
 														)}
 												</>
@@ -1308,7 +1334,14 @@ export default function DagEditor({
 												className="range-editor-primary"
 												disabled={!actionLabel || !canWriteFiles}
 											>
-												Add action
+												<svg
+													className="range-editor-button-icon"
+													viewBox="0 0 24 24"
+													aria-hidden="true"
+												>
+													<path d="M12 5v14M5 12h14" />
+												</svg>
+												<span>Add action</span>
 											</button>
 										</form>
 									)}

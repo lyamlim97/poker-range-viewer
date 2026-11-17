@@ -1198,19 +1198,55 @@ button.flagged::after {
 }
 
 .range-editor-refresh {
-	padding: 6px 10px;
+	height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	padding: 0 12px;
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: 8px;
 	background: var(--btn);
 	color: var(--text);
 	font: inherit;
 	font-size: 12px;
+	font-weight: 700;
 	cursor: pointer;
 	white-space: nowrap;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease,
+		transform 0.15s ease,
+		box-shadow 0.15s ease;
 }
 
 .range-editor-refresh:hover {
 	background: var(--btn-hover);
+	border-color: #465364;
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.range-editor-refresh:active {
+	transform: translateY(1px);
+}
+
+.range-editor-refresh:focus-visible,
+.range-editor-danger:focus-visible,
+.range-editor-primary:focus-visible {
+	outline: 2px solid rgba(247, 84, 84, 0.85);
+	outline-offset: 2px;
+}
+
+.range-editor-button-icon {
+	width: 15px;
+	height: 15px;
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 
 .range-editor-header h1 {
@@ -1653,18 +1689,36 @@ button.flagged::after {
 }
 
 .range-editor-danger {
-	padding: 6px 10px;
+	height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	padding: 0 12px;
 	border: 1px solid rgba(248, 113, 113, 0.35);
-	border-radius: 6px;
+	border-radius: 8px;
 	background: rgba(248, 113, 113, 0.08);
 	color: #f87171;
 	font: inherit;
 	font-size: 12px;
+	font-weight: 700;
 	cursor: pointer;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease,
+		transform 0.15s ease,
+		box-shadow 0.15s ease;
 }
 
 .range-editor-danger:hover {
 	background: rgba(248, 113, 113, 0.16);
+	border-color: rgba(248, 113, 113, 0.62);
+	box-shadow: 0 6px 16px rgba(248, 113, 113, 0.08);
+}
+
+.range-editor-danger:active {
+	transform: translateY(1px);
 }
 
 .range-editor-danger:disabled {
@@ -2061,6 +2115,56 @@ button.flagged::after {
 	font: inherit;
 }
 
+.range-editor-open-target {
+	height: 36px;
+	width: fit-content;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	margin-top: 3px;
+	padding: 0 12px 0 14px;
+	border: 1px solid rgba(125, 211, 252, 0.38);
+	border-radius: 8px;
+	background: rgba(56, 189, 248, 0.09);
+	color: #7dd3fc;
+	font: inherit;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease,
+		transform 0.15s ease,
+		box-shadow 0.15s ease;
+}
+
+.range-editor-open-target:hover {
+	border-color: rgba(125, 211, 252, 0.68);
+	background: rgba(56, 189, 248, 0.15);
+	box-shadow: 0 7px 16px rgba(56, 189, 248, 0.08);
+}
+
+.range-editor-open-target:active {
+	transform: translateY(1px);
+}
+
+.range-editor-open-target:focus-visible {
+	outline: 2px solid rgba(125, 211, 252, 0.85);
+	outline-offset: 2px;
+}
+
+.range-editor-open-target .range-editor-button-icon {
+	width: 14px;
+	height: 14px;
+	transition: transform 0.15s ease;
+}
+
+.range-editor-open-target:hover .range-editor-button-icon {
+	transform: translateX(2px);
+}
+
 .range-editor-destination-heading {
 	display: flex;
 	align-items: center;
@@ -2121,8 +2225,34 @@ button.flagged::after {
 
 .range-editor-primary {
 	justify-self: start;
-	border-color: rgba(247, 84, 84, 0.45);
-	background: rgba(247, 84, 84, 0.16);
+	height: 38px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	min-width: 112px;
+	padding: 0 14px;
+	border-color: rgba(247, 84, 84, 0.68);
+	border-radius: 8px;
+	background: var(--accent);
+	color: #fff;
+	font-weight: 700;
+	box-shadow: 0 6px 16px rgba(247, 84, 84, 0.16);
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease,
+		transform 0.15s ease,
+		box-shadow 0.15s ease;
+}
+
+.range-editor-primary:hover:not(:disabled) {
+	background: #ff6666;
+	border-color: #ff7777;
+	box-shadow: 0 8px 18px rgba(247, 84, 84, 0.22);
+}
+
+.range-editor-primary:active:not(:disabled) {
+	transform: translateY(1px);
 }
 
 .range-editor-form-error {
