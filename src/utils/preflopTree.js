@@ -45,7 +45,7 @@ function getNodePosition(node) {
 }
 
 function hasNoSavedStrategy(node) {
-	return node?.tags?.includes("almost-never-reached") === true;
+	return node?.strategyUnavailable === true;
 }
 
 export function normalizeActionPath(actionHistory = {}) {
@@ -220,6 +220,14 @@ function resolveTreeNode(solutionData, actionHistory, onTransition) {
 			node.children?.[event.action];
 		if (typeof option === "object" && option?.terminal === true) {
 			node = { terminal: true, actions: [] };
+			continue;
+		}
+		if (option?.tags?.includes("almost-never-reached") === true) {
+			node = {
+				tags: ["almost-never-reached"],
+				strategyUnavailable: true,
+				actions: [],
+			};
 			continue;
 		}
 		if (!nextId) return null;

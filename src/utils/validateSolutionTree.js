@@ -1,4 +1,5 @@
 const POSITION_IDS = new Set(["EP", "MP", "CO", "BU", "SB", "BB"]);
+const POSITION_ORDER = ["EP", "MP", "CO", "BU", "SB", "BB"];
 
 function getNodeEntries(rawNodes) {
 	if (Array.isArray(rawNodes)) {
@@ -25,6 +26,125 @@ function getNodeEntries(rawNodes) {
 function getActionKeys(action) {
 	if (typeof action === "string") return [action];
 	return [action?.label, action?.id].filter((key) => typeof key === "string" && key);
+}
+
+function isAlmostNeverReached(value) {
+	return (
+		Array.isArray(value?.tags) &&
+		value.tags.includes("almost-never-reached")
+	);
+}
+
+function parseNodeHistory(nodeId) {
+	const parts = nodeId.split("_");
+	if (parts.length % 2 === 0 || !POSITION_IDS.has(parts[parts.length - 1])) {
+		return null;
+	}
+
+	const history = [];
+	for (let index = 0; index < parts.length - 1; index += 2) {
+		if (!POSITION_IDS.has(parts[index]) || !parts[index + 1]) return null;
+		history.push({ position: parts[index], actionToken: parts[index + 1] });
+	}
+
+	return { history, currentPosition: parts[parts.length - 1] };
+}
+
+function isAggressiveToken(actionToken) {
+	return /^(?:RFI|SQZ|AI|\d+B)$/i.test(actionToken);
+}
+
+function getActionToken(action, history) {
+	const label = (getActionKeys(action)[0] || "").trim();
+	if (/^fold\b/i.test(label)) return "F";
+	if (/^call\b/i.test(label)) return "C";
+	if (/^check\b/i.test(label)) return "X";
+	if (/^(?:all[\s-]*in|jam|AI)\b/i.test(label)) return "AI";
+	if (/\b(?:squeeze|SQZ)\b/i.test(label)) return "SQZ";
+
+	let lastAggressionIndex = -1;
+	for (let index = history.length - 1; index >= 0; index--) {
+		if (isAggressiveToken(history[index].actionToken)) {
+			lastAggressionIndex = index;
+			break;
+		}
+	}
+	const callsAfterLastAggression = history
+		.slice(lastAggressionIndex + 1)
+		.some(({ actionToken }) => actionToken === "C");
+	const raiseCount = history.filter(({ actionToken }) =>
+		isAggressiveToken(actionToken)
+	).length;
+	const isSqueeze = raiseCount === 1 && callsAfterLastAggression;
+
+	const numberedBet = label.match(/\b(\d+)\s*[- ]?\s*bet\b/i);
+	if (numberedBet) {
+		if (numberedBet[1] === "3" && isSqueeze) return "SQZ";
+		return `${numberedBet[1]}B`;
+	}
+	const wordBet = label.match(/\b(three|four|five|six|seven|eight|nine)[\s-]*bet\b/i);
+	if (wordBet) {
+		const betNumbers = {
+			three: 3,
+			four: 4,
+			five: 5,
+			six: 6,
+			seven: 7,
+			eight: 8,
+			nine: 9,
+		};
+		if (wordBet[1].toLowerCase() === "three" && isSqueeze) return "SQZ";
+		return `${betNumbers[wordBet[1].toLowerCase()]}B`;
+	}
+
+	if (/^open\b/i.test(label)) return "RFI";
+	if (/^raise\b/i.test(label)) {
+		if (raiseCount === 0) return "RFI";
+		if (isSqueeze) return "SQZ";
+		return `${raiseCount + 2}B`;
+	}
+
+	return null;
+}
+
+function getExpectedNextNodeId(sourceNodeId, action) {
+	const parsedSource = parseNodeHistory(sourceNodeId);
+	if (!parsedSource) return null;
+
+	const actionToken = getActionToken(action, parsedSource.history);
+	if (!actionToken) return null;
+
+	const events = [
+		...parsedSource.history,
+		{ position: parsedSource.currentPosition, actionToken },
+	];
+	const folded = new Set();
+	const allIn = new Set();
+	let actedSinceRaise = new Set();
+	let lastAggressor = null;
+
+	for (const event of events) {
+		if (event.actionToken === "F") folded.add(event.position);
+		if (event.actionToken === "AI") allIn.add(event.position);
+
+		if (isAggressiveToken(event.actionToken)) {
+			lastAggressor = event.position;
+			actedSinceRaise = new Set([event.position]);
+		} else {
+			actedSinceRaise.add(event.position);
+		}
+	}
+
+	const currentIndex = POSITION_ORDER.indexOf(parsedSource.currentPosition);
+	for (let offset = 1; offset <= POSITION_ORDER.length; offset++) {
+		const nextPosition = POSITION_ORDER[(currentIndex + offset) % POSITION_ORDER.length];
+		if (folded.has(nextPosition) || allIn.has(nextPosition)) continue;
+		if (actedSinceRaise.has(nextPosition)) continue;
+		if (lastAggressor && nextPosition === lastAggressor) continue;
+		return { nodeId: `${sourceNodeId}_${actionToken}_${nextPosition}` };
+	}
+
+	return { nodeId: null };
 }
 
 function getMappedTarget(node, action) {
@@ -79,10 +199,7 @@ export function validateSolutionTree(solutionData = {}) {
 		if (entry.node && typeof entry.node === "object") {
 			const idPosition = nodeId.split("_").pop();
 			const declaredPosition = entry.node.position;
-			const isEndpoint =
-				entry.node.terminal === true ||
-				(Array.isArray(entry.node.tags) &&
-					entry.node.tags.includes("almost-never-reached"));
+			const isEndpoint = entry.node.terminal === true;
 			const hasIdPosition = POSITION_IDS.has(idPosition);
 			const hasDeclaredPosition = POSITION_IDS.has(declaredPosition);
 			if (
@@ -103,11 +220,14 @@ export function validateSolutionTree(solutionData = {}) {
 	const missingTargets = [];
 	const missingTargetKeys = new Set();
 	const actionsWithoutNextNode = new Map();
+	const wronglyLinkedNodes = [];
+	const wronglyLinkedKeys = new Set();
 	const adjacency = new Map([...nodes.keys()].map((nodeId) => [nodeId, new Set()]));
 	const outgoingReferenceNodeIds = new Set();
 	const incompleteNodeIds = new Set();
 	const invalidEndpointNodeIds = new Set();
-	const terminalActionsWithLinks = new Set();
+	const outcomeActionsWithLinks = new Set();
+	const misplacedRareNodeTags = new Set();
 
 	function addTarget(sourceNodeId, target) {
 		if (typeof target !== "string" || !target.trim()) {
@@ -134,6 +254,25 @@ export function validateSolutionTree(solutionData = {}) {
 		adjacency.get(sourceNodeId)?.add(target);
 	}
 
+	function checkActionTarget(sourceNodeId, action, target) {
+		const targetNodeId = typeof target === "string" ? target : target?.nodeId;
+		if (typeof targetNodeId !== "string" || !nodes.has(targetNodeId)) return;
+
+		const expected = getExpectedNextNodeId(sourceNodeId, action);
+		if (!expected || targetNodeId === expected.nodeId) return;
+
+		const actionLabel = getActionKeys(action)[0] || "(unknown action)";
+		const key = `${sourceNodeId}\u0000${actionLabel}\u0000${targetNodeId}`;
+		if (wronglyLinkedKeys.has(key)) return;
+		wronglyLinkedKeys.add(key);
+		wronglyLinkedNodes.push({
+			sourceNodeId,
+			action: actionLabel,
+			targetNodeId,
+			expectedNodeId: expected.nodeId,
+		});
+	}
+
 	if (typeof rootNodeId !== "string" || !nodes.has(rootNodeId)) {
 		const targetNodeId =
 			typeof rootNodeId === "string" && rootNodeId
@@ -149,9 +288,8 @@ export function validateSolutionTree(solutionData = {}) {
 		}
 
 		const actions = Array.isArray(node.actions) ? node.actions : [];
-		const isEndpoint =
-			node.terminal === true ||
-			(Array.isArray(node.tags) && node.tags.includes("almost-never-reached"));
+		const isEndpoint = node.terminal === true;
+		if (isAlmostNeverReached(node)) misplacedRareNodeTags.add(nodeId);
 
 		if (isEndpoint && actions.length > 0) {
 			invalidEndpointNodeIds.add(nodeId);
@@ -164,18 +302,20 @@ export function validateSolutionTree(solutionData = {}) {
 				action && typeof action === "object" ? action.nextNodeId : null;
 			const isTerminalAction =
 				action && typeof action === "object" && action.terminal === true;
+			const isRareAction = isAlmostNeverReached(action);
 			const mappedTarget = getMappedTarget(node, action);
 			const target = directTarget ?? mappedTarget;
 
 			if (
-				isTerminalAction &&
+				(isTerminalAction || isRareAction) &&
 				(directTarget != null || mappedTarget != null)
 			) {
-				terminalActionsWithLinks.add(nodeId);
+				outcomeActionsWithLinks.add(nodeId);
 			}
 			if (
 				!isEndpoint &&
 				!isTerminalAction &&
+				!isRareAction &&
 				!(typeof directTarget === "string" && directTarget.trim())
 			) {
 				actionsWithoutNextNode.set(
@@ -186,15 +326,17 @@ export function validateSolutionTree(solutionData = {}) {
 			if (target != null) {
 				outgoingReferenceNodeIds.add(nodeId);
 				addTarget(nodeId, target);
+				checkActionTarget(nodeId, action, target);
 			}
 		}
 
 		for (const mapping of [node.next, node.children]) {
 			if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) continue;
-			for (const target of Object.values(mapping)) {
+			for (const [action, target] of Object.entries(mapping)) {
 				if (target != null) {
 					outgoingReferenceNodeIds.add(nodeId);
 					addTarget(nodeId, target);
+					checkActionTarget(nodeId, action, target);
 				}
 			}
 		}
@@ -258,21 +400,25 @@ export function validateSolutionTree(solutionData = {}) {
 	const issueCount =
 		missingTargets.length +
 		actionsWithoutNextNodeCount +
+		wronglyLinkedNodes.length +
 		unreachableNodeIds.length +
 		cycles.length +
 		invalidEndpointNodeIds.size +
-		terminalActionsWithLinks.size +
+		outcomeActionsWithLinks.size +
+		misplacedRareNodeTags.size +
 		incompleteNodeIds.size +
 		invalidNodeIds.size;
 
 	return {
 		missingTargets,
+		wronglyLinkedNodes,
 		actionsWithoutNextNode: [...actionsWithoutNextNode].map(([nodeId]) => nodeId),
 		actionsWithoutNextNodeCount,
 		unreachableNodeIds,
 		cycles,
 		invalidEndpointNodeIds: [...invalidEndpointNodeIds],
-		terminalActionsWithLinks: [...terminalActionsWithLinks],
+		outcomeActionsWithLinks: [...outcomeActionsWithLinks],
+		misplacedRareNodeTags: [...misplacedRareNodeTags],
 		incompleteNodeIds: [...incompleteNodeIds],
 		invalidNodeIds: [...invalidNodeIds],
 		issueCount,

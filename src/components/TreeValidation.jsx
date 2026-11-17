@@ -14,6 +14,13 @@ export default function TreeValidation({ solutionData }) {
 			),
 		},
 		{
+			title: `Wrongly linked nodes (${report.wronglyLinkedNodes.length})`,
+			items: report.wronglyLinkedNodes.map(
+				({ sourceNodeId, action, targetNodeId, expectedNodeId }) =>
+					`${sourceNodeId} — ${action} → ${targetNodeId} (expected ${expectedNodeId || "no next node"})`
+			),
+		},
+		{
 			title: `Actions without nextNodeId (${report.actionsWithoutNextNodeCount})`,
 			items: report.actionsWithoutNextNode,
 		},
@@ -26,12 +33,16 @@ export default function TreeValidation({ solutionData }) {
 			items: report.cycles.map((cycle) => cycle.join(" → ")),
 		},
 		{
-			title: `Terminal or almost-never-reached nodes with actions/links (${report.invalidEndpointNodeIds.length})`,
+			title: `Terminal nodes with actions/links (${report.invalidEndpointNodeIds.length})`,
 			items: report.invalidEndpointNodeIds,
 		},
 		{
-			title: `Terminal actions with links (${report.terminalActionsWithLinks.length})`,
-			items: report.terminalActionsWithLinks,
+			title: `Terminal or almost-never-reached actions with links (${report.outcomeActionsWithLinks.length})`,
+			items: report.outcomeActionsWithLinks,
+		},
+		{
+			title: `Almost-never-reached tags on nodes (move to actions) (${report.misplacedRareNodeTags.length})`,
+			items: report.misplacedRareNodeTags,
 		},
 		{
 			title: `Unfinished decision nodes (${report.incompleteNodeIds.length})`,
@@ -58,8 +69,9 @@ export default function TreeValidation({ solutionData }) {
 				</span>
 			</div>
 			<p className="rv-tree-validation-description">
-				Each action must link to a listed node, and every branch must end at a
-				terminal or almost-never-reached node.
+				Each non-terminal action link must match its expected next node, and
+				branches without a next node must end at a terminal action or an
+				almost-never-reached action.
 			</p>
 			{groups.length === 0 ? (
 				<p className="rv-tree-validation-empty">No structural issues found.</p>
