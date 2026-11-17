@@ -237,14 +237,13 @@ export default function RangeViewer({
 		[currentRangesData, rawVal]
 	);
 	const referenceComboFreq = useMemo(
-		() =>
-			scenario?.referenceStrategy
-				? parseSolutionStrategy(
-						currentRangesData,
-						scenario.referenceStrategy
-					).comboFreq
-				: null,
-		[currentRangesData, scenario?.referenceStrategy]
+		() => {
+			const referenceStrategy = scenario?.referenceStrategy;
+			return referenceStrategy
+				? parseSolutionStrategy(currentRangesData, referenceStrategy).comboFreq
+				: null;
+		},
+		[currentRangesData, scenario]
 	);
 	const solutionModal = (
 		<SolutionModal
