@@ -271,10 +271,14 @@ export default function DagCanvas({
 					aria-label="Find a node or position"
 				/>
 				<span className="dag-toolbar-count">{nodeIds.length} nodes</span>
-				<button type="button" onClick={() => zoomBy(1.25)} aria-label="Zoom in">+</button>
-				<button type="button" onClick={() => zoomBy(0.8)} aria-label="Zoom out">−</button>
-				<button type="button" onClick={() => fitView()}>Fit</button>
-				<button type="button" onClick={resetLayout}>Auto layout</button>
+				<div className="dag-toolbar-actions">
+					<div className="dag-zoom-controls" role="group" aria-label="Zoom controls">
+						<button type="button" onClick={() => zoomBy(1.25)} aria-label="Zoom in">+</button>
+						<button type="button" onClick={() => zoomBy(0.8)} aria-label="Zoom out">−</button>
+					</div>
+					<button className="dag-toolbar-button" type="button" onClick={() => fitView()}>Fit</button>
+					<button className="dag-toolbar-button" type="button" onClick={resetLayout}>Auto layout</button>
+				</div>
 			</div>
 			<div
 				ref={containerRef}

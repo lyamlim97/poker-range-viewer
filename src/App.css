@@ -1181,9 +1181,7 @@ button.flagged::after {
 }
 
 .range-editor-header {
-	display: flex;
 	align-items: flex-start;
-	justify-content: space-between;
 	gap: 20px;
 	margin-bottom: 16px;
 }
@@ -1398,13 +1396,14 @@ button.flagged::after {
 .dag-toolbar {
 	display: flex;
 	align-items: center;
+	flex-wrap: wrap;
 	gap: 8px;
 	padding: 8px 10px;
 	border-bottom: 1px solid var(--border);
 }
 
 .dag-toolbar input {
-	flex: 1;
+	flex: 1 1 180px;
 	min-width: 0;
 	min-height: 32px;
 	padding: 5px 9px;
@@ -1415,24 +1414,75 @@ button.flagged::after {
 	font: inherit;
 }
 
-.dag-toolbar button,
+.dag-toolbar .dag-toolbar-button,
 .dag-add {
-	padding: 5px 10px;
 	border: 1px solid var(--border);
 	border-radius: 6px;
 	background: var(--btn);
 	color: var(--text);
 	font: inherit;
-	font-size: 12px;
 	cursor: pointer;
 }
 
-.dag-toolbar button:hover,
+.dag-toolbar .dag-toolbar-button:hover,
 .dag-add:hover {
 	background: var(--btn-hover);
 }
 
+.dag-toolbar-actions {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 6px;
+}
+
+.dag-toolbar .dag-toolbar-button {
+	height: 32px;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.dag-zoom-controls {
+	display: inline-flex;
+	height: 32px;
+	overflow: hidden;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--btn);
+}
+
+.dag-toolbar .dag-zoom-controls button {
+	width: 32px;
+	height: 30px;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	font-size: 15px;
+	line-height: 1;
+}
+
+.dag-toolbar .dag-zoom-controls button + button {
+	border-left: 1px solid var(--border);
+}
+
+.dag-toolbar .dag-zoom-controls button:hover {
+	background: var(--btn-hover);
+}
+
+.dag-toolbar button:focus-visible,
+.dag-add:focus-visible {
+	outline: 2px solid rgba(247, 84, 84, 0.55);
+	outline-offset: 2px;
+}
+
+.dag-toolbar button:active,
+.dag-add:active {
+	transform: translateY(1px);
+}
+
 .dag-toolbar-count {
+	flex: none;
 	color: var(--muted);
 	font-size: 11px;
 	white-space: nowrap;
