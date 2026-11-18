@@ -55,6 +55,10 @@ const ACTION_TYPES = [
 	{ id: "all-in", label: "All-in", hasSize: true, optionalSize: true },
 ];
 
+const GROUP_ACTION_PRESETS = [
+	{ id: "fold-call", label: "Fold + Call", actions: ["fold", "call"] },
+];
+
 function makeSlug(value) {
 	return value
 		.toLowerCase()
@@ -145,10 +149,24 @@ export default function DagEditor({
 	const [selectedActionKey, setSelectedActionKey] = useState("");
 	const [addFocusTick, setAddFocusTick] = useState(0);
 	const addCardRef = useRef(null);
+	const groupCardRef = useRef(null);
+	const [groupActionsOpen, setGroupActionsOpen] = useState(true);
+	const [singleActionOpen, setSingleActionOpen] = useState(false);
 	const [newActionKind, setNewActionKind] = useState("raise");
 	const [newActionSize, setNewActionSize] = useState("2.5");
 	const [newActionOutcome, setNewActionOutcome] = useState("continue");
 	const [addActionError, setAddActionError] = useState("");
+	const [groupPresetId, setGroupPresetId] = useState("fold-call");
+	const [groupSelectedKinds, setGroupSelectedKinds] = useState(["fold", "call"]);
+	const [groupSizes, setGroupSizes] = useState({
+		raise: "2.5",
+		"3-bet": "2.5",
+		"4-bet": "2.5",
+		"5-bet": "2.5",
+		squeeze: "2.5",
+		"all-in": "",
+	});
+	const [groupAddError, setGroupAddError] = useState("");
 	const [revision, setRevision] = useState(0);
 	const [savedRevision, setSavedRevision] = useState(0);
 	const [saveState, setSaveState] = useState({ status: "saved" });
@@ -239,10 +257,43 @@ export default function DagEditor({
 	const currentLoadStatus = !loadMatchesSelection
 		? "loading"
 		: loadState.status;
+	const groupPreview = useMemo(() => {
+		if (!selectedNode) return [];
+		return groupSelectedKinds.map((kind) => {
+			const size = groupSizes[kind] || "";
+			const label = makeActionLabel(kind, size);
+			if (!label) {
+				return {
+					kind,
+					label: null,
+					target: "",
+					outcome: "invalid",
+					duplicate: false,
+				};
+			}
+			const target = expectedTargetOf(selectedNodeId, { label });
+			const duplicate = selectedActions.some(
+				(action) => getActionLabel(action).toLowerCase() === label.toLowerCase()
+			);
+			return {
+				kind,
+				label,
+				target,
+				outcome: target ? "continue" : "terminal",
+				duplicate,
+			};
+		});
+	}, [
+		groupSelectedKinds,
+		groupSizes,
+		selectedActions,
+		selectedNode,
+		selectedNodeId,
+	]);
 
 	useEffect(() => {
 		if (addFocusTick === 0) return;
-		const card = addCardRef.current;
+		const card = groupCardRef.current || addCardRef.current;
 		if (!card) return;
 		card.scrollIntoView({ behavior: "smooth", block: "nearest" });
 		card.querySelector("select, button")?.focus({ preventScroll: true });
@@ -294,6 +345,13 @@ export default function DagEditor({
 				setSaveState({ status: "saved" });
 				setConflictRevision(null);
 				setAddActionError("");
+				setGroupPresetId("fold-call");
+				setGroupSelectedKinds(["fold", "call"]);
+				setGroupAddError("");
+				setGroupActionsOpen(true);
+				setSingleActionOpen(false);
+				setGroupActionsOpen(true);
+				setSingleActionOpen(false);
 			} catch (error) {
 				if (cancelled || error.name === "AbortError") return;
 				setLoadState({
@@ -553,6 +611,114 @@ export default function DagEditor({
 		setNewActionOutcome("continue");
 	}
 
+	function applyGroupPreset(presetId) {
+		setGroupAddError("");
+		setGroupPresetId(presetId);
+		if (presetId === "custom") {
+			setGroupSelectedKinds([]);
+			return;
+		}
+		const preset = GROUP_ACTION_PRESETS.find((item) => item.id === presetId);
+		if (!preset) return;
+		const availableKinds = preset.actions.filter((kind) => {
+			const size = groupSizes[kind] || "";
+			const label = makeActionLabel(kind, size);
+			if (!label) return false;
+			return !selectedActions.some(
+				(action) =>
+					getActionLabel(action).toLowerCase() === label.toLowerCase()
+			);
+		});
+		setGroupSelectedKinds(availableKinds);
+	}
+
+	function toggleGroupKind(kind) {
+		setGroupPresetId("custom");
+		setGroupAddError("");
+		setGroupSelectedKinds((current) =>
+			current.includes(kind)
+				? current.filter((item) => item !== kind)
+				: [...current, kind]
+		);
+	}
+
+	function updateGroupSize(kind, value) {
+		setGroupSizes((current) => ({ ...current, [kind]: value }));
+		setGroupAddError("");
+	}
+
+	function addActionGroup() {
+		setGroupAddError("");
+		if (!canWriteFiles) {
+			setGroupAddError("Editing requires the local Vite development server.");
+			return;
+		}
+		if (!selectedNode || selectedNode.terminal === true) {
+			setGroupAddError("Reopen this terminal node before adding actions.");
+			return;
+		}
+		if (groupSelectedKinds.length === 0) {
+			setGroupAddError("Select at least one action.");
+			return;
+		}
+
+		const usedActions = [...selectedActions];
+		const additions = [];
+		for (const kind of groupSelectedKinds) {
+			const size = groupSizes[kind] || "";
+			const label = makeActionLabel(kind, size);
+			if (!label) {
+				setGroupAddError("Enter a valid bet size greater than zero.");
+				return;
+			}
+			if (
+				usedActions.some(
+					(action) =>
+						getActionLabel(action).toLowerCase() === label.toLowerCase()
+				)
+			) {
+				setGroupAddError(`This action already exists: ${label}.`);
+				return;
+			}
+
+			const action = {
+				id: makeUniqueActionId(label, usedActions),
+				label,
+			};
+			const target = expectedTargetOf(selectedNodeId, action);
+			if (target) {
+				action.nextNodeId = target;
+			} else {
+				action.terminal = true;
+			}
+			additions.push(action);
+			usedActions.push(action);
+		}
+
+		updateSolution((current) => {
+			let next = updateNode(current, selectedNodeId, (node) => ({
+				...node,
+				actions: [...getNodeActions(node), ...additions],
+			}));
+			const targets = [
+				...new Set(
+					additions
+						.map((action) => action.nextNodeId)
+						.filter(Boolean)
+				),
+			];
+			for (const target of targets) {
+				next = withPlaceholderNode(next, target);
+			}
+			return next;
+		});
+
+		setSelectedActionKey(additions[0].id);
+		setGroupPresetId("custom");
+		setGroupSelectedKinds([]);
+		setGroupAddError("");
+	}
+
 	function reopenNode() {
 		updateSolution((current) =>
 			updateNode(current, selectedNodeId, (node) => ({
@@ -699,6 +865,9 @@ export default function DagEditor({
 		setSelectedNodeId(id);
 		setSelectedActionKey("");
 		setAddActionError("");
+		setGroupPresetId("fold-call");
+		setGroupSelectedKinds(["fold", "call"]);
+		setGroupAddError("");
 	}
 
 	function handleSolutionChange(event) {
@@ -858,6 +1027,7 @@ export default function DagEditor({
 						}}
 						onAddAction={(nodeId) => {
 							selectNode(nodeId);
+							setGroupActionsOpen(true);
 							setAddFocusTick((current) => current + 1);
 						}}
 						onDeleteNode={deleteNode}
@@ -870,10 +1040,10 @@ export default function DagEditor({
 								<section className="range-editor-card">
 									<div className="range-editor-node-heading">
 										<div>
-											<div className="range-editor-eyebrow">
+											<div className="range-editor-section-heading">
 												{solution.rootNodeId === selectedNodeId
-													? "Root decision"
-													: "Decision node"}
+													? "Root Decision"
+													: "Decision Node"}
 											</div>
 											<h2>{selectedNode.position || getNodeIdPosition(selectedNodeId)}</h2>
 										</div>
@@ -1022,6 +1192,197 @@ export default function DagEditor({
 												below; continuation nodes are created automatically.
 											</p>
 										)}
+								</section>
+
+								<section
+										className="range-editor-card range-editor-group-card"
+										ref={groupCardRef}
+								>
+										<button
+											type="button"
+											className="range-editor-collapse-toggle"
+											onClick={() => setGroupActionsOpen((open) => !open)}
+											aria-expanded={groupActionsOpen}
+										>
+											<span className="range-editor-section-heading">Add actions</span>
+											<span className="toggle-arrow" aria-hidden="true">
+												{groupActionsOpen ? "▼" : "▶"}
+											</span>
+										</button>
+										{groupActionsOpen && (selectedNode.terminal === true ? (
+											<p className="range-editor-help">
+												Reopen this node before adding actions.
+											</p>
+										) : (
+											<>
+												<div className="range-editor-group-presets">
+													<span>Presets</span>
+													<div className="range-editor-preset-buttons">
+														{GROUP_ACTION_PRESETS.map((preset) => (
+															<button
+																key={preset.id}
+																type="button"
+																className={
+																	groupPresetId === preset.id
+																		? "range-editor-preset-button active"
+																		: "range-editor-preset-button"
+																}
+																onClick={() => applyGroupPreset(preset.id)}
+																disabled={!canWriteFiles}
+															>
+																{preset.label}
+															</button>
+														))}
+														<button
+															type="button"
+															className={
+																groupPresetId === "custom"
+																	? "range-editor-preset-button active"
+																	: "range-editor-preset-button"
+															}
+															onClick={() => applyGroupPreset("custom")}
+															disabled={!canWriteFiles}
+														>
+															Custom
+														</button>
+													</div>
+												</div>
+
+												<div className="range-editor-group-actions">
+													{ACTION_TYPES.map((type) => {
+														const size = groupSizes[type.id] || "";
+														const label = makeActionLabel(type.id, size);
+														const selected = groupSelectedKinds.includes(type.id);
+														const existing = Boolean(
+															label &&
+																selectedActions.some(
+																	(action) =>
+																		getActionLabel(action).toLowerCase() ===
+																		label.toLowerCase()
+																)
+														);
+														return (
+															<div
+																key={type.id}
+																className={[
+																	"range-editor-group-action",
+																	selected ? "selected" : "",
+																	existing ? "existing" : "",
+																].filter(Boolean).join(" ")}
+																style={{
+																	"--dag-action-color": actionColor(label || type.label),
+																}}
+															>
+																<input
+																	type="checkbox"
+																	checked={selected}
+																	onChange={() => toggleGroupKind(type.id)}
+																	disabled={!canWriteFiles || existing}
+																/>
+																<span className="range-editor-group-action-label">
+																	{type.label}
+																</span>
+																{existing && (
+																	<span className="range-editor-group-existing">
+																		Already exists
+																	</span>
+																)}
+																{type.hasSize && selected && !existing && (
+																	<input
+																		type="number"
+																		min="0.01"
+																		step="0.01"
+																		className="range-editor-group-size"
+																		value={size}
+																		onChange={(event) =>
+																			updateGroupSize(type.id, event.target.value)
+																		}
+																		placeholder={
+																			type.optionalSize ? "Optional" : "2.5"
+																		}
+																		aria-label={`${type.label} size in big blinds`}
+																	/>
+																)}
+															</div>
+														);
+													})}
+												</div>
+
+												{groupPreview.length > 0 && (
+													<div className="range-editor-group-preview">
+														<span>Preview</span>
+														{groupPreview.map((item) => (
+															<div
+																key={item.kind}
+																className={
+																	item.duplicate || item.outcome === "invalid"
+																		? "range-editor-group-preview-row warning"
+																		: "range-editor-group-preview-row"
+																}
+															>
+																<strong>{item.label || "Invalid size"}</strong>
+																<span>
+																	{item.duplicate
+																		? "Already exists"
+																		: item.outcome === "invalid"
+																			? "Enter a valid size"
+																			: item.target
+																				? `Continue to ${item.target}`
+																				: "Terminal fallback"}
+																</span>
+															</div>
+														))}
+													</div>
+												)}
+
+												{groupAddError && (
+													<p className="range-editor-group-error" role="alert">
+														{groupAddError}
+													</p>
+												)}
+
+												<div className="range-editor-group-footer">
+													<button
+														type="button"
+														className="range-editor-secondary"
+														onClick={() => {
+															setGroupPresetId("custom");
+															setGroupSelectedKinds([]);
+															setGroupAddError("");
+														}}
+														disabled={!canWriteFiles}
+													>
+														Cancel
+													</button>
+													<button
+														type="button"
+														className="range-editor-primary"
+														onClick={addActionGroup}
+														disabled={
+															!canWriteFiles ||
+															groupSelectedKinds.length === 0 ||
+															groupPreview.some(
+																(item) =>
+																	!item.label ||
+																	item.duplicate
+															)
+														}
+													>
+														<svg
+															className="range-editor-button-icon"
+															viewBox="0 0 24 24"
+															aria-hidden="true"
+														>
+															<path d="M12 5v14M5 12h14" />
+														</svg>
+														<span>
+															Add {groupSelectedKinds.length} action
+															{groupSelectedKinds.length === 1 ? "" : "s"}
+														</span>
+													</button>
+												</div>
+											</>
+										))}
 								</section>
 
 								{selectedAction && (
@@ -1225,13 +1586,18 @@ export default function DagEditor({
 								)}
 
 								<section className="range-editor-card" ref={addCardRef}>
-									<div className="range-editor-card-heading">
-										<div>
-											<div className="range-editor-eyebrow">Build the tree</div>
-											<h3>Add an action</h3>
-										</div>
-									</div>
-									{selectedNode.terminal === true ? (
+									<button
+										type="button"
+										className="range-editor-collapse-toggle"
+										onClick={() => setSingleActionOpen((open) => !open)}
+										aria-expanded={singleActionOpen}
+									>
+										<span className="range-editor-section-heading">Add an action</span>
+										<span className="toggle-arrow" aria-hidden="true">
+											{singleActionOpen ? "▼" : "▶"}
+										</span>
+									</button>
+									{singleActionOpen && (selectedNode.terminal === true ? (
 										<p className="range-editor-help">
 											Reopen this node before adding actions.
 										</p>
@@ -1336,13 +1702,7 @@ export default function DagEditor({
 												<span>Add action</span>
 											</button>
 										</form>
-									)}
-									<p className="range-editor-help">
-										The node ID is generated from the current path, action, and
-										next position. Action labels determine the token (for example
-										<code> F</code>, <code>RFI</code>, <code>3B</code>,{" "}
-										<code>4B</code>, <code>SQZ</code>, or <code>AI</code>).
-									</p>
+									))}
 								</section>
 								{selectedNodeIssues.length > 0 && (
 									<details className="range-editor-node-issues">
