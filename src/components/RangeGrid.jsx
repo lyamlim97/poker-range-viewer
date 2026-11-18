@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { actionColor, compareActions } from "../utils/actions";
+import { actionColor, compareActionsDescending } from "../utils/actions";
 import { checkRangeConsistency } from "../utils/checkRange";
 import { RANKS, getHandType, handAt } from "../utils/hands";
 
@@ -21,10 +21,10 @@ const Cell = memo(function Cell({
 }) {
 	const type = getHandType(hand);
 
-	// Order segments Fold, Call, raises by type then size, All-in.
+	// Reverse the action hierarchy for horizontal range-bar segments.
 	const entries = Object.entries(actions)
 		.filter(([, freq]) => freq > 0)
-		.sort(([a], [b]) => compareActions(a, b));
+		.sort(([a], [b]) => compareActionsDescending(a, b));
 
 	// Compare against the prior action range when one is available.
 	const { total, expected, status } = checkRangeConsistency({

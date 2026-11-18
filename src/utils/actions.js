@@ -32,13 +32,16 @@ export function actionColor(action) {
 const FOLD_RE = /^fold\b/i;
 const CALL_RE = /^call\b/i;
 const ALL_IN_RE = /^(?:all[\s-]?in|jam)\b/i;
-// Index in this list is the rank within the raise family.
-const RAISE_RANK_RES = [
-	/^5[\s-]?bet\b/i,
-	/^4[\s-]?bet\b/i,
-	/^3[\s-]?bet\b/i,
-	/^squeeze\b/i,
+// Actions are displayed from passive play through increasingly aggressive raises.
+const ACTION_RANK_RES = [
+	/^fold\b/i,
+	/^call\b/i,
 	/^(?:raise|bet)\b/i,
+	/^3[\s-]?bet\b/i,
+	/^4[\s-]?bet\b/i,
+	/^5[\s-]?bet\b/i,
+	/^squeeze\b/i,
+	/^(?:all[\s-]?in|jam)\b/i,
 ];
 const AGGRESSIVE_RE = /^(?:raise|bet|all[\s-]?in|jam|[345][\s-]?bet|squeeze)/i;
 const AMOUNT_RE = /([\d.]+)\s*(?:bb)?\s*$/i;
@@ -84,12 +87,12 @@ export function classifyAction(action) {
 	const text = getActionText(action);
 	const size = getActionAmount(text) ?? 0;
 
-	if (ALL_IN_RE.test(text)) return { category: 0, rank: 0, size };
-	const raiseRank = RAISE_RANK_RES.findIndex((re) => re.test(text));
-	if (raiseRank >= 0) return { category: 1, rank: raiseRank, size };
-	if (CALL_RE.test(text)) return { category: 2, rank: 0, size };
-	if (FOLD_RE.test(text)) return { category: 3, rank: 0, size: 0 };
-	return { category: 4, rank: 0, size: 0 };
+	const actionRank = ACTION_RANK_RES.findIndex((re) => re.test(text));
+	return {
+		category: actionRank >= 0 ? actionRank : ACTION_RANK_RES.length,
+		rank: 0,
+		size: actionRank >= 2 && actionRank <= 6 ? size : 0,
+	};
 }
 
 export function compareActions(left, right) {
@@ -109,6 +112,10 @@ export function compareActions(left, right) {
 		numeric: true,
 		sensitivity: "base",
 	});
+}
+
+export function compareActionsDescending(left, right) {
+	return compareActions(right, left);
 }
 
 export function getOrderedActions(actions) {

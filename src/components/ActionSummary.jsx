@@ -1,4 +1,4 @@
-import { actionColor, compareActions } from "../utils/actions";
+import { actionColor, compareActionsDescending } from "../utils/actions";
 import { comboCount } from "../utils/hands";
 
 export default function ActionSummary({ freq = {} }) {
@@ -17,7 +17,9 @@ export default function ActionSummary({ freq = {} }) {
 		}
 	}
 
-	const entries = Object.entries(actions).sort(([a], [b]) => compareActions(a, b));
+	const entries = Object.entries(actions).sort(([a], [b]) =>
+		compareActionsDescending(a, b)
+	);
 	const totalCombos = entries.reduce((sum, [, { combos }]) => sum + combos, 0);
 
 	if (entries.length === 0) {
