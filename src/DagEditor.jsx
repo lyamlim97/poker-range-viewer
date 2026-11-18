@@ -928,26 +928,6 @@ export default function DagEditor({
 											/>
 										</>
 									)}
-									{selectedNodeIssues.length > 0 && (
-										<div className="range-editor-node-issues" role="status">
-											<strong>
-												⚠ {selectedNodeIssues.length} validation issue
-												{selectedNodeIssues.length === 1 ? "" : "s"}
-											</strong>
-											<ul>
-												{selectedNodeIssues.map((issue, index) => (
-													<li
-														key={`${issue.category}-${issue.action || issue.targetNodeId || index}`}
-														className={`range-editor-node-issue ${issue.severity}`}
-													>
-														<span>{issue.category.replaceAll("-", " ")}</span>
-														<p>{issue.message}</p>
-													</li>
-												))}
-											</ul>
-										</div>
-									)}
-
 									{selectedNode.terminal !== true && selectedActions.length > 0 && (
 										<div className="range-editor-action-list">
 											{getOrderedActions(selectedActions).map(({ action, key }) => {
@@ -1364,6 +1344,25 @@ export default function DagEditor({
 										<code>4B</code>, <code>SQZ</code>, or <code>AI</code>).
 									</p>
 								</section>
+								{selectedNodeIssues.length > 0 && (
+									<details className="range-editor-node-issues">
+										<summary>
+											⚠ {selectedNodeIssues.length} validation issue
+											{selectedNodeIssues.length === 1 ? "" : "s"}
+										</summary>
+										<ul>
+											{selectedNodeIssues.map((issue, index) => (
+												<li
+													key={`${issue.category}-${issue.action || issue.targetNodeId || index}`}
+													className={`range-editor-node-issue ${issue.severity}`}
+												>
+													<span>{issue.category.replaceAll("-", " ")}</span>
+													<p>{issue.message}</p>
+												</li>
+											))}
+										</ul>
+									</details>
+								)}
 							</>
 						) : (
 							<div className="range-editor-message">
@@ -1384,7 +1383,7 @@ export default function DagEditor({
 									{validationReport.issueCount === 0 &&
 									missingRangeItems.length === 0
 										? "Tree checks passed; all action ranges are present"
-										: [
+										: `⚠ ${[
 												otherTreeIssueCount > 0
 													? `${otherTreeIssueCount} tree issue${otherTreeIssueCount === 1 ? "" : "s"}`
 													: null,
@@ -1393,7 +1392,7 @@ export default function DagEditor({
 													: null,
 											]
 												.filter(Boolean)
-												.join(" · ")}
+												.join(" · ")}`}
 								</summary>
 								{validationGroups.length > 0 && (
 									<ul>
