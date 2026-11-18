@@ -33,17 +33,22 @@ export function computeAutoLayout(solution) {
 		? solution.rootNodeId
 		: ids[0];
 	const depth = new Map();
+	const layoutOrder = new Map();
 
 	if (rootId) {
 		depth.set(rootId, 0);
+		layoutOrder.set(0, [rootId]);
 		const queue = [rootId];
 		for (let head = 0; head < queue.length; head += 1) {
 			const id = queue[head];
-			for (const action of getActions(nodes[id])) {
+			for (const { action } of getOrderedActions(getActions(nodes[id]))) {
 				const target = getTarget(action);
 				if (target && Object.hasOwn(nodes, target) && !depth.has(target)) {
-					depth.set(target, depth.get(id) + 1);
+					const targetDepth = depth.get(id) + 1;
+					depth.set(target, targetDepth);
 					queue.push(target);
+					if (!layoutOrder.has(targetDepth)) layoutOrder.set(targetDepth, []);
+					layoutOrder.get(targetDepth).push(target);
 				}
 			}
 		}
@@ -51,19 +56,23 @@ export function computeAutoLayout(solution) {
 
 	const orphanDepth = Math.max(-1, ...depth.values()) + 1;
 	for (const id of ids) {
-		if (!depth.has(id)) depth.set(id, orphanDepth);
+		if (!depth.has(id)) {
+			depth.set(id, orphanDepth);
+			if (!layoutOrder.has(orphanDepth)) layoutOrder.set(orphanDepth, []);
+			layoutOrder.get(orphanDepth).push(id);
+		}
 	}
 
-	const columnY = new Map();
 	const layout = {};
-	for (const id of ids) {
-		const column = depth.get(id);
-		const y = columnY.get(column) || 0;
-		layout[id] = { x: column * (NODE_WIDTH + COLUMN_GAP), y };
-		columnY.set(
-			column,
-			y + getNodeHeight(getActions(nodes[id]).length) + ROW_GAP
-		);
+	for (const [column, orderedIds] of layoutOrder) {
+		let nextY = 0;
+		for (const id of orderedIds) {
+			layout[id] = {
+				x: column * (NODE_WIDTH + COLUMN_GAP),
+				y: nextY,
+			};
+			nextY += getNodeHeight(getActions(nodes[id]).length) + ROW_GAP;
+		}
 	}
 	return layout;
 }
