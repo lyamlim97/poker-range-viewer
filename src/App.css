@@ -1158,6 +1158,64 @@ button.flagged::after {
 	gap: 12px;
 }
 
+.rv-node-id-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 8px 10px;
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+}
+
+.rv-node-id-value {
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--muted);
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.rv-node-id-value code {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--text);
+	font-size: 11px;
+	text-transform: none;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	letter-spacing: 0;
+}
+
+.rv-node-id-copy {
+	flex: 0 0 auto;
+	height: 24px;
+	padding: 0 8px;
+	transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.rv-node-id-copy.copied {
+	background: #10b981;
+	color: #ffffff;
+	animation: rv-copy-pop 0.28s ease-out;
+}
+
+@keyframes rv-copy-pop {
+	0% {
+		transform: scale(0.92);
+	}
+	65% {
+		transform: scale(1.06);
+	}
+	100% {
+		transform: scale(1);
+}
+}
+
 /* Range Editor */
 .range-editor {
 	max-width: 1500px;

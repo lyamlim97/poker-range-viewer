@@ -481,6 +481,11 @@ export function computePositionStack(posId, actionHistory = {}, defaultStack = 1
 export function resolveSpotFromSolution(activePosition, actionHistory = {}, solutionData = {}) {
 	const position = activePosition;
 	const node = resolveTreeNode(solutionData, actionHistory);
+	const nodes = getSolutionNodes(solutionData);
+	const nodeId =
+		node?.nodeId ||
+		Object.entries(nodes || {}).find(([, candidate]) => candidate === node)?.[0] ||
+		null;
 	const strategyUnavailable = hasNoSavedStrategy(node);
 	const nodePosition = getNodePosition(node);
 	const previousActionReference =
@@ -507,6 +512,7 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 		.join(" > ");
 
 	return {
+		nodeId,
 		title: node?.title || spot?.title || defaultTitle,
 		terminal: node?.terminal === true,
 		tags: Array.isArray(node?.tags) ? node.tags : [],

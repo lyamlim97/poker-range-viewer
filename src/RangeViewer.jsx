@@ -24,6 +24,28 @@ function yieldToBrowser() {
 	return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+async function copyTextToClipboard(text) {
+	try {
+		if (navigator.clipboard?.writeText) {
+			await navigator.clipboard.writeText(text);
+			return true;
+		}
+	} catch {
+		// Fall through to the browser-compatible copy fallback.
+	}
+
+	const textarea = document.createElement("textarea");
+	textarea.value = text;
+	textarea.setAttribute("readonly", "");
+	textarea.style.position = "fixed";
+	textarea.style.opacity = "0";
+	document.body.appendChild(textarea);
+	textarea.select();
+	const copied = document.execCommand("copy");
+	textarea.remove();
+	return copied;
+}
+
 export default function RangeViewer({
 	solutionIndex = EMPTY_SOLUTION_INDEX,
 	solutionUrls = EMPTY_SOLUTION_URLS,
@@ -62,7 +84,15 @@ export default function RangeViewer({
 	);
 	const [actionPath, setActionPath] = useState([]);
 	const [selectedHand, setSelectedHand] = useState("AA");
+	const [copiedNodeId, setCopiedNodeId] = useState(null);
 	const reloadSnapshotRef = useRef(null);
+	const copyResetRef = useRef(null);
+
+	useEffect(() => {
+		return () => {
+			if (copyResetRef.current) clearTimeout(copyResetRef.current);
+		};
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -270,6 +300,18 @@ export default function RangeViewer({
 		return resolveSpotFromSolution(activePosition, actionPath, currentRangesData);
 	}, [activePosition, actionPath, currentRangesData]);
 	const hasUnsavedRareStrategy = scenario?.tags?.includes("almost-never-reached") === true;
+	const handleCopyNodeId = async () => {
+		if (!scenario?.nodeId) return;
+		const copied = await copyTextToClipboard(scenario.nodeId);
+		if (!copied) return;
+
+		setCopiedNodeId(scenario.nodeId);
+		if (copyResetRef.current) clearTimeout(copyResetRef.current);
+		copyResetRef.current = setTimeout(() => {
+			setCopiedNodeId(null);
+			copyResetRef.current = null;
+		}, 1600);
+	};
 
 	// The solution resolver returns the strategy alongside its title and action path.
 	const rawVal = scenario?.strategy;
@@ -416,6 +458,23 @@ export default function RangeViewer({
 
 						{/* Right Column: GTO Wizard Sidebar */}
 						<div className="rv-sidebar-column">
+							{scenario?.nodeId && (
+								<div className="rv-node-id-row">
+									<div className="rv-node-id-value">
+										<span>Node ID</span>
+										<code>{scenario.nodeId}</code>
+									</div>
+									<button
+										type="button"
+										className={`rv-node-id-copy ${copiedNodeId === scenario.nodeId ? "copied" : ""}`}
+										onClick={handleCopyNodeId}
+										aria-label={`Copy node ID ${scenario.nodeId}`}
+									>
+										{copiedNodeId === scenario.nodeId ? "Copied!" : "Copy"}
+									</button>
+								</div>
+							)}
+
 							{/* Top: Strategy Action Breakdown Cards */}
 							<ActionSummary freq={freq} />
 
