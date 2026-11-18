@@ -13,10 +13,6 @@ const KNOWN = {
 	fold: "var(--action-fold)",
 };
 
-// Any action not listed above gets one of these, picked from its name,
-// so it always keeps the same colour.
-const PALETTE = ["#f59e0b", "#a855f7", "#14b8a6", "#ec4899", "#84cc16", "#06b6d4"];
-
 export function actionColor(action) {
 	const key = action.toLowerCase().replace(/[\s-]+/g, "");
 	if (KNOWN[key]) return KNOWN[key];
@@ -24,9 +20,7 @@ export function actionColor(action) {
 	const baseAction = key.match(/^(jam|allin|raise|3bet|4bet|5bet|squeeze|bet|call|fold)/)?.[1];
 	if (baseAction && KNOWN[baseAction]) return KNOWN[baseAction];
 
-	let hash = 0;
-	for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-	return PALETTE[hash % PALETTE.length];
+	return "var(--action-other)";
 }
 
 const FOLD_RE = /^fold\b/i;

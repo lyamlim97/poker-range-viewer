@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { actionColor } from "../utils/actions";
+import { actionColor, compareActionsDescending } from "../utils/actions";
 import { getCombosForHand } from "../utils/parseRange";
 import { getHandType } from "../utils/hands";
 
@@ -40,7 +40,9 @@ export default function HandDetail({
 	const maxCombos = combos.length;
 
 	// Calculate hand-level total frequencies
-	const actionEntries = Object.entries(handActions).filter(([, f]) => f > 0);
+	const actionEntries = Object.entries(handActions)
+		.filter(([, f]) => f > 0)
+		.sort(([a], [b]) => compareActionsDescending(a, b));
 	const totalActionFreq = actionEntries.reduce((sum, [, f]) => sum + f, 0);
 
 	return (
@@ -73,15 +75,15 @@ export default function HandDetail({
 					{combos.map((combo) => {
 						// Retrieve specific combo actions if available, else hand actions
 						const actionsForCombo = (comboFreq && comboFreq[combo.id]) || handActions || {};
-						const comboEntries = Object.entries(actionsForCombo).filter(
-							([, f]) => f > 0
-						);
+						const comboEntries = Object.entries(actionsForCombo)
+							.filter(([, f]) => f > 0)
+							.sort(([a], [b]) => compareActionsDescending(a, b));
 
 						// Determine which actions to show in the list
 						const actionsToShow =
 							allActions.length > 0
-								? allActions
-								: Object.keys(actionsForCombo);
+								? [...allActions].sort(compareActionsDescending)
+								: Object.keys(actionsForCombo).sort(compareActionsDescending);
 
 						return (
 							<div key={combo.id} className="rv-combo-card">
@@ -123,7 +125,7 @@ export default function HandDetail({
 										const freq = (actionsForCombo[action] || 0) * 100;
 										return (
 											<div key={action} className="rv-combo-action-row">
-												<span className="rv-combo-act-name">{action}</span>
+												<span>{action}</span>
 												<span className="rv-combo-act-val">
 													{freq.toFixed(1)}
 												</span>

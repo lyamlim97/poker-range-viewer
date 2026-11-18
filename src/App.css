@@ -30,6 +30,7 @@
 	--action-bet: var(--danger);
 	--action-call: var(--positive);
 	--action-fold: #2a7785;
+	--action-other: #a855f7;
 }
 
 * {
@@ -2611,7 +2612,6 @@ button.flagged::after {
 	position: absolute;
 	inset: 0;
 	display: flex;
-	opacity: 0.35;
 	pointer-events: none;
 	z-index: 1;
 }
