@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import {
-	POSITIONS_6MAX,
 	computePositionActionOptions,
 	computePositionStack,
 	getNextPosition,
 } from "../utils/preflopTree";
+import { POSITIONS_6MAX, getSeat } from "../utils/positions";
 import { actionColor } from "../utils/actions";
 
 function ActionNode({
@@ -80,16 +80,15 @@ export default function PreflopNav({
 	isStrategyUnavailable = false,
 }) {
 	const currentNodeRef = useRef(null);
-	const historyNodes = actionPath.map((node, index) => {
-		const prefix = actionPath.slice(0, index);
-		const position = POSITIONS_6MAX.find((seat) => seat.id === node.position);
-		return {
-			...node,
-			index,
-			actions: computePositionActionOptions(node.position, prefix, openSize, solutionData),
-			stack: computePositionStack(node.position, prefix, position?.defaultStack),
-		};
+	const buildNavNode = (position, path, extra) => ({
+		position,
+		actions: computePositionActionOptions(position, path, openSize, solutionData),
+		stack: computePositionStack(position, path, getSeat(position)?.defaultStack),
+		...extra,
 	});
+	const historyNodes = actionPath.map((node, index) =>
+		buildNavNode(node.position, actionPath.slice(0, index), { ...node, index })
+	);
 
 	const previewNodes = [];
 	let projectedPath = [...actionPath];
@@ -97,16 +96,14 @@ export default function PreflopNav({
 		const position = getNextPosition(projectedPath, solutionData);
 		if (!position) break;
 
-		const seat = POSITIONS_6MAX.find((item) => item.id === position);
-		previewNodes.push({
-			position,
-			index: actionPath.length,
-			actions: computePositionActionOptions(position, projectedPath, openSize, solutionData),
-			stack: computePositionStack(position, projectedPath, seat?.defaultStack),
-			isCurrent: index === 0,
-			isPreview: index > 0,
-			isSelected: activePosition === position,
-		});
+		previewNodes.push(
+			buildNavNode(position, projectedPath, {
+				index: actionPath.length,
+				isCurrent: index === 0,
+				isPreview: index > 0,
+				isSelected: activePosition === position,
+			})
+		);
 		if (isStrategyUnavailable) break;
 		projectedPath = [...projectedPath, { position, action: "Fold" }];
 	}

@@ -10,8 +10,15 @@
 	--btn-hover: #384251;
 	--accent: #f75454;
 
-	--fill: #f75454;
 	--empty: #232b35;
+	--input-bg: #141920;
+
+	/* Status colours */
+	--warn: #fbbf24;
+	--danger: #f87171;
+	--success: #34d399;
+	--positive: #10b981;
+	--info: #7dd3fc;
 
 	/* Action colours: this is the shared colour location for the viewer and DAG */
 	--action-jam: #7f1d1d;
@@ -20,8 +27,8 @@
 	--action-4bet: #b91c1c;
 	--action-5bet: #991b1b;
 	--action-squeeze: #9f1239;
-	--action-bet: #f87171;
-	--action-call: #10b981;
+	--action-bet: var(--danger);
+	--action-call: var(--positive);
 	--action-fold: #2a7785;
 }
 
@@ -445,12 +452,12 @@ button.flagged::after {
 
 .range-check.ok {
 	background: rgba(16, 185, 129, 0.12);
-	color: #34d399;
+	color: var(--success);
 }
 
 .range-check.warn {
 	background: rgba(245, 158, 11, 0.12);
-	color: #fbbf24;
+	color: var(--warn);
 }
 
 .range-check.muted {
@@ -490,12 +497,6 @@ button.flagged::after {
 	color: var(--text);
 }
 
-.mode-btn.active {
-	background: var(--card);
-	color: var(--text);
-	box-shadow: inset 0 -2px 0 var(--accent);
-}
-
 .tabs-label {
 	margin: 0 6px 6px 0;
 	font-size: 11px;
@@ -517,6 +518,7 @@ button.flagged::after {
 	color: var(--text);
 }
 
+.mode-btn.active,
 .tab.active {
 	background: var(--card);
 	color: var(--text);
@@ -639,7 +641,7 @@ button.flagged::after {
 }
 
 .rv-tree-heading {
-	color: #e8ecf1;
+	color: var(--text);
 	font-size: 12px;
 	font-weight: 700;
 }
@@ -681,7 +683,7 @@ button.flagged::after {
 
 .rv-tree-seat.active {
 	background: rgba(16, 185, 129, 0.14);
-	border-color: #10b981;
+	border-color: var(--positive);
 	color: #6ee7b7;
 }
 
@@ -731,7 +733,7 @@ button.flagged::after {
 
 .rv-tree-node.current {
 	background: rgba(16, 185, 129, 0.06);
-	border-color: #10b981;
+	border-color: var(--positive);
 	box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15);
 }
 
@@ -837,7 +839,7 @@ button.flagged::after {
 
 .rv-modal-content {
 	background: #181d24;
-	border: 1px solid #2a313b;
+	border: 1px solid var(--border);
 	border-radius: 10px;
 	width: 780px;
 	max-width: 95vw;
@@ -849,7 +851,7 @@ button.flagged::after {
 
 .rv-modal-header {
 	margin-bottom: 16px;
-	border-bottom: 1px solid #2a313b;
+	border-bottom: 1px solid var(--border);
 	padding-bottom: 12px;
 }
 
@@ -947,7 +949,7 @@ button.flagged::after {
 }
 
 .rv-solutions-table-wrap {
-	border: 1px solid #2a313b;
+	border: 1px solid var(--border);
 	border-radius: 6px;
 	overflow: hidden;
 }
@@ -964,7 +966,7 @@ button.flagged::after {
 	padding: 8px 12px;
 	font-weight: 700;
 	color: #9ca3af;
-	border-bottom: 1px solid #2a313b;
+	border-bottom: 1px solid var(--border);
 }
 
 .rv-solutions-table td {
@@ -1021,13 +1023,6 @@ button.flagged::after {
 	border-radius: 8px;
 }
 
-.rv-tree-validation-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-}
-
 .rv-tree-validation-header h2 {
 	margin: 0;
 	font-size: 14px;
@@ -1040,11 +1035,11 @@ button.flagged::after {
 }
 
 .rv-tree-validation-status.has-issues {
-	color: #fbbf24;
+	color: var(--warn);
 }
 
 .rv-tree-validation-status.is-complete {
-	color: #34d399;
+	color: var(--success);
 }
 
 .rv-tree-validation-description,
@@ -1094,7 +1089,8 @@ button.flagged::after {
 	font-size: 11px;
 }
 
-.rv-terminal-state {
+.rv-terminal-state,
+.rv-unavailable-strategy {
 	display: flex;
 	flex: 1;
 	flex-direction: column;
@@ -1109,23 +1105,13 @@ button.flagged::after {
 }
 
 .rv-unavailable-strategy {
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: 8px;
-	min-height: 240px;
 	padding: 20px;
-	background: var(--card);
-	border: 1px solid rgba(245, 158, 11, 0.35);
-	border-radius: 8px;
-	color: var(--muted);
+	border-color: rgba(245, 158, 11, 0.35);
 	text-align: center;
 }
 
 .rv-unavailable-strategy strong {
-	color: #fbbf24;
+	color: var(--warn);
 }
 
 .rv-grid-column {
@@ -1199,7 +1185,7 @@ button.flagged::after {
 }
 
 .rv-node-id-copy.copied {
-	background: #10b981;
+	background: var(--positive);
 	color: #ffffff;
 	animation: rv-copy-pop 0.28s ease-out;
 }
@@ -1225,13 +1211,12 @@ button.flagged::after {
 
 .range-editor-header,
 .range-editor-toolbar,
-.range-editor-sidebar-heading,
 .range-editor-node-heading,
 .range-editor-card-heading,
 .range-editor-action-top,
 .range-editor-action-bottom,
 .range-editor-range-footer,
-.range-editor-destination-row {
+.rv-tree-validation-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -1252,28 +1237,39 @@ button.flagged::after {
 	justify-content: flex-end;
 }
 
-.range-editor-refresh {
+.range-editor-refresh,
+.range-editor-danger,
+.range-editor-open-target {
 	height: 36px;
+	border-radius: 8px;
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.range-editor-refresh,
+.range-editor-danger,
+.range-editor-open-target,
+.range-editor-primary {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 7px;
-	padding: 0 12px;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	background: var(--btn);
-	color: var(--text);
-	font: inherit;
-	font-size: 12px;
 	font-weight: 700;
-	cursor: pointer;
-	white-space: nowrap;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 	transition:
 		background 0.15s ease,
 		border-color 0.15s ease,
 		transform 0.15s ease,
 		box-shadow 0.15s ease;
+}
+
+.range-editor-refresh {
+	gap: 7px;
+	padding: 0 12px;
+	border: 1px solid var(--border);
+	background: var(--btn);
+	color: var(--text);
+	white-space: nowrap;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .range-editor-refresh:hover {
@@ -1331,15 +1327,15 @@ button.flagged::after {
 }
 
 .range-editor-save-status.saved {
-	color: #34d399;
+	color: var(--success);
 }
 
 .range-editor-save-status.pending {
-	color: #fbbf24;
+	color: var(--warn);
 }
 
 .range-editor-save-status.error {
-	color: #f87171;
+	color: var(--danger);
 }
 
 .range-editor-status-dot {
@@ -1377,12 +1373,12 @@ button.flagged::after {
 .range-editor-toolbar select,
 .range-editor-add-form select,
 .range-editor-add-form input,
-.range-editor-sidebar input {
+.range-editor-outcome-editor select {
 	min-height: 34px;
 	padding: 6px 9px;
 	border: 1px solid var(--border);
 	border-radius: 6px;
-	background: #141920;
+	background: var(--input-bg);
 	color: var(--text);
 	font: inherit;
 }
@@ -1410,7 +1406,7 @@ button.flagged::after {
 	border: 1px solid rgba(245, 158, 11, 0.3);
 	border-radius: 8px;
 	background: rgba(245, 158, 11, 0.08);
-	color: #fbbf24;
+	color: var(--warn);
 	font-size: 13px;
 }
 
@@ -1467,7 +1463,7 @@ button.flagged::after {
 	padding: 5px 9px;
 	border: 1px solid var(--border);
 	border-radius: 6px;
-	background: #141920;
+	background: var(--input-bg);
 	color: var(--text);
 	font: inherit;
 }
@@ -1550,8 +1546,8 @@ button.flagged::after {
 	position: relative;
 	flex: 1;
 	overflow: hidden;
-	background-color: #141920;
-	background-image: radial-gradient(#2a313b 1px, transparent 1px);
+	background-color: var(--input-bg);
+	background-image: radial-gradient(var(--border) 1px, transparent 1px);
 	background-size: 22px 22px;
 	cursor: grab;
 	touch-action: none;
@@ -1613,8 +1609,8 @@ button.flagged::after {
 }
 
 .dag-node.problem {
-	border-color: #fbbf24;
-	box-shadow: 0 0 0 1px #fbbf24, 0 6px 16px rgba(0, 0, 0, 0.45);
+	border-color: var(--warn);
+	box-shadow: 0 0 0 1px var(--warn), 0 6px 16px rgba(0, 0, 0, 0.45);
 }
 
 .dag-node.problem.selected {
@@ -1628,7 +1624,7 @@ button.flagged::after {
 	gap: 6px;
 	height: 30px;
 	padding: 0 8px;
-	background: #232b35;
+	background: var(--empty);
 	font-size: 12px;
 	cursor: move;
 }
@@ -1652,7 +1648,7 @@ button.flagged::after {
 	padding: 1px 5px;
 	border-radius: 4px;
 	background: rgba(56, 189, 248, 0.12);
-	color: #7dd3fc;
+	color: var(--info);
 	font-size: 9px;
 	font-weight: 600;
 	text-transform: uppercase;
@@ -1672,7 +1668,7 @@ button.flagged::after {
 	height: 18px;
 	padding: 0 5px;
 	background: rgba(251, 191, 36, 0.15);
-	color: #fbbf24;
+	color: var(--warn);
 	font-size: 11px;
 	line-height: 18px;
 	text-transform: none;
@@ -1747,7 +1743,7 @@ button.flagged::after {
 .dag-action-delete:hover {
 	border-color: rgba(248, 113, 113, 0.45);
 	background: rgba(248, 113, 113, 0.12);
-	color: #f87171;
+	color: var(--danger);
 }
 
 .dag-action-delete:disabled {
@@ -1783,7 +1779,7 @@ button.flagged::after {
 
 .dag-action-badge.warning {
 	background: rgba(251, 191, 36, 0.15);
-	color: #fbbf24;
+	color: var(--warn);
 }
 
 .dag-action-badge.terminal {
@@ -1793,7 +1789,7 @@ button.flagged::after {
 
 .dag-action-badge.rare {
 	background: rgba(56, 189, 248, 0.12);
-	color: #7dd3fc;
+	color: var(--info);
 }
 
 .dag-dot {
@@ -1804,7 +1800,7 @@ button.flagged::after {
 }
 
 .dag-dot.complete {
-	background: #34d399;
+	background: var(--success);
 }
 
 .dag-dot.empty {
@@ -1812,7 +1808,7 @@ button.flagged::after {
 }
 
 .dag-dot.incomplete {
-	background: #fbbf24;
+	background: var(--warn);
 }
 
 .dag-port {
@@ -1823,7 +1819,7 @@ button.flagged::after {
 	height: 8px;
 	border: 1px solid var(--bg);
 	border-radius: 50%;
-	background: #7dd3fc;
+	background: var(--info);
 	transform: translateY(-50%);
 }
 
@@ -1846,7 +1842,7 @@ button.flagged::after {
 	border: 1px solid rgba(248, 113, 113, 0.35);
 	border-radius: 5px;
 	background: rgba(248, 113, 113, 0.08);
-	color: #f87171;
+	color: var(--danger);
 	font: inherit;
 	font-size: 11px;
 	cursor: pointer;
@@ -1857,26 +1853,12 @@ button.flagged::after {
 }
 
 .range-editor-danger {
-	height: 36px;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 	gap: 7px;
 	padding: 0 12px;
 	border: 1px solid rgba(248, 113, 113, 0.35);
-	border-radius: 8px;
 	background: rgba(248, 113, 113, 0.08);
-	color: #f87171;
-	font: inherit;
-	font-size: 12px;
-	font-weight: 700;
-	cursor: pointer;
+	color: var(--danger);
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-	transition:
-		background 0.15s ease,
-		border-color 0.15s ease,
-		transform 0.15s ease,
-		box-shadow 0.15s ease;
 }
 
 .range-editor-danger:hover {
@@ -1901,97 +1883,10 @@ button.flagged::after {
 	background: var(--card);
 }
 
-.range-editor-sidebar-heading {
-	color: var(--text);
-	font-size: 13px;
-}
-
-.range-editor-sidebar-heading span,
 .range-editor-count {
 	color: var(--muted);
 	font-size: 11px;
 	font-weight: 500;
-}
-
-.range-editor-sidebar input {
-	width: 100%;
-}
-
-.range-editor-node-list {
-	display: flex;
-	flex-direction: column;
-	gap: 5px;
-	min-height: 80px;
-	overflow-y: auto;
-}
-
-.range-editor-node {
-	display: flex;
-	flex-direction: column;
-	align-items: stretch;
-	gap: 4px;
-	width: 100%;
-	height: auto;
-	padding: 8px;
-	border: 1px solid transparent;
-	border-radius: 6px;
-	background: transparent;
-	color: var(--text);
-	text-align: left;
-}
-
-.range-editor-node:hover {
-	background: var(--btn);
-}
-
-.range-editor-node.active {
-	border-color: rgba(247, 84, 84, 0.5);
-	background: rgba(247, 84, 84, 0.1);
-}
-
-.range-editor-node-position {
-	display: flex;
-	align-items: center;
-	gap: 7px;
-	font-size: 12px;
-	font-weight: 650;
-}
-
-.range-editor-root-tag {
-	padding: 2px 5px;
-	border-radius: 4px;
-	background: rgba(56, 189, 248, 0.12);
-	color: #7dd3fc;
-	font-size: 9px;
-	font-weight: 600;
-	text-transform: uppercase;
-}
-
-.range-editor-node-id {
-	overflow: hidden;
-	color: var(--muted);
-	font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-	font-size: 10px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.range-editor-node-meta {
-	display: flex;
-	justify-content: space-between;
-	gap: 6px;
-	color: var(--muted);
-	font-size: 10px;
-}
-
-.range-editor-missing-count {
-	color: #fbbf24;
-}
-
-.range-editor-empty {
-	color: var(--muted);
-	font-size: 12px;
-	text-align: center;
 }
 
 .range-editor-main {
@@ -2036,13 +1931,13 @@ button.flagged::after {
 }
 
 .range-editor-node-issue span {
-	color: #fbbf24;
+	color: var(--warn);
 	font-weight: 700;
 	text-transform: capitalize;
 }
 
 .range-editor-node-issue.error span {
-	color: #f87171;
+	color: var(--danger);
 }
 
 .range-editor-node-issue p {
@@ -2090,13 +1985,13 @@ button.flagged::after {
 .range-editor-range-check.ok {
 	border-color: rgba(52, 211, 153, 0.28);
 	background: rgba(52, 211, 153, 0.08);
-	color: #34d399;
+	color: var(--success);
 }
 
 .range-editor-range-check.warning {
 	border-color: rgba(251, 191, 36, 0.28);
 	background: rgba(251, 191, 36, 0.08);
-	color: #fbbf24;
+	color: var(--warn);
 }
 
 .range-editor-action-list {
@@ -2155,7 +2050,7 @@ button.flagged::after {
 	border: 1px solid rgba(248, 113, 113, 0.28);
 	border-radius: 5px;
 	background: rgba(248, 113, 113, 0.06);
-	color: #f87171;
+	color: var(--danger);
 	font-size: 10px;
 }
 
@@ -2197,7 +2092,7 @@ button.flagged::after {
 
 .range-editor-action-badge.warning {
 	background: rgba(251, 191, 36, 0.15);
-	color: #fbbf24;
+	color: var(--warn);
 }
 
 .range-editor-action-badge.terminal {
@@ -2207,7 +2102,7 @@ button.flagged::after {
 
 .range-editor-action-badge.rare {
 	background: rgba(56, 189, 248, 0.12);
-	color: #7dd3fc;
+	color: var(--info);
 }
 
 .range-editor-action-bottom {
@@ -2223,14 +2118,14 @@ button.flagged::after {
 	padding: 3px 6px;
 	border-radius: 4px;
 	background: rgba(245, 158, 11, 0.12);
-	color: #fbbf24;
+	color: var(--warn);
 	font-size: 9px;
 	font-weight: 600;
 }
 
 .range-editor-range-pill.complete {
 	background: rgba(16, 185, 129, 0.12);
-	color: #34d399;
+	color: var(--success);
 }
 
 .range-editor-range-pill.empty {
@@ -2278,7 +2173,7 @@ button.flagged::after {
 	border: 1px solid var(--border);
 	border-radius: 6px;
 	outline: none;
-	background: #141920;
+	background: var(--input-bg);
 	color: var(--text);
 	font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 	font-size: 11px;
@@ -2289,8 +2184,7 @@ button.flagged::after {
 .range-editor-range-input:focus,
 .range-editor-toolbar select:focus,
 .range-editor-add-form select:focus,
-.range-editor-add-form input:focus,
-.range-editor-sidebar input:focus {
+.range-editor-add-form input:focus {
 	border-color: rgba(247, 84, 84, 0.7);
 }
 
@@ -2303,7 +2197,7 @@ button.flagged::after {
 
 .range-editor-range-footer .warning,
 .range-editor-validation summary.warning {
-	color: #fbbf24;
+	color: var(--warn);
 }
 
 .range-editor-range-footer .range-editor-secondary {
@@ -2312,7 +2206,7 @@ button.flagged::after {
 
 .range-editor-delete-range {
 	border-color: rgba(248, 113, 113, 0.28);
-	color: #f87171;
+	color: var(--danger);
 }
 
 .range-editor-secondary,
@@ -2352,48 +2246,15 @@ button.flagged::after {
 	font-size: 11px;
 }
 
-.range-editor-destination-row {
-	justify-content: flex-start;
-	flex-wrap: wrap;
-}
-
-.range-editor-destination-row > span {
-	overflow-wrap: anywhere;
-}
-
-.range-editor-outcome-editor select {
-	min-height: 34px;
-	padding: 6px 9px;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	background: #141920;
-	color: var(--text);
-	font: inherit;
-}
-
 .range-editor-open-target {
-	height: 36px;
 	width: fit-content;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 	gap: 8px;
 	margin-top: 3px;
 	padding: 0 12px 0 14px;
 	border: 1px solid rgba(125, 211, 252, 0.38);
-	border-radius: 8px;
 	background: rgba(56, 189, 248, 0.09);
-	color: #7dd3fc;
-	font: inherit;
-	font-size: 12px;
-	font-weight: 700;
-	cursor: pointer;
+	color: var(--info);
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-	transition:
-		background 0.15s ease,
-		border-color 0.15s ease,
-		transform 0.15s ease,
-		box-shadow 0.15s ease;
 }
 
 .range-editor-open-target:hover {
@@ -2482,9 +2343,6 @@ button.flagged::after {
 .range-editor-primary {
 	justify-self: start;
 	height: 38px;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 	gap: 7px;
 	min-width: 112px;
 	padding: 0 14px;
@@ -2492,13 +2350,7 @@ button.flagged::after {
 	border-radius: 8px;
 	background: var(--accent);
 	color: #fff;
-	font-weight: 700;
 	box-shadow: 0 6px 16px rgba(247, 84, 84, 0.16);
-	transition:
-		background 0.15s ease,
-		border-color 0.15s ease,
-		transform 0.15s ease,
-		box-shadow 0.15s ease;
 }
 
 .range-editor-primary:hover:not(:disabled) {
@@ -2526,12 +2378,12 @@ button.flagged::after {
 
 .range-editor-validation summary {
 	cursor: pointer;
-	color: #fbbf24;
+	color: var(--warn);
 	font-weight: 600;
 }
 
 .range-editor-validation summary.valid {
-	color: #34d399;
+	color: var(--success);
 }
 
 .range-editor-validation ul {
@@ -2735,7 +2587,7 @@ button.flagged::after {
 
 .rv-combo-card {
 	position: relative;
-	background: #141920;
+	background: var(--input-bg);
 	border: 1px solid var(--border);
 	border-radius: 6px;
 	overflow: hidden;

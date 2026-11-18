@@ -1,64 +1,38 @@
-export const RANKS = "AKQJT98765432";
+import { RANKS, comboCount, getHandType } from "./hands";
+
+export { RANKS };
+
 const R = "[2-9TJQKA]";
 const idx = (r) => RANKS.indexOf(r);
-export const SUITS = ["s", "h", "d", "c"];
-const solutionRangeCaches = new WeakMap();
+const SUITS = ["s", "h", "d", "c"];
+const strategyCache = new WeakMap();
 const handComboCache = new Map();
 
-function cacheHandCombos(hand, combos) {
-	handComboCache.set(hand, combos);
-	return combos;
+function suitPairsFor(type) {
+	const pairs = [];
+	for (let i = 0; i < SUITS.length; i++) {
+		if (type === "suited") pairs.push([SUITS[i], SUITS[i]]);
+		for (let j = 0; j < SUITS.length; j++) {
+			if (type === "pair" ? j > i : type === "offsuit" && j !== i) {
+				pairs.push([SUITS[i], SUITS[j]]);
+			}
+		}
+	}
+	return pairs;
 }
 
 export function getCombosForHand(hand) {
 	if (!hand) return [];
 	if (handComboCache.has(hand)) return handComboCache.get(hand);
-	if (hand.length === 2) {
-		const r = hand[0];
-		const combos = [];
-		for (let i = 0; i < SUITS.length; i++) {
-			for (let j = i + 1; j < SUITS.length; j++) {
-				const s1 = SUITS[i];
-				const s2 = SUITS[j];
-				combos.push({
-					id: `${r}${s1}${r}${s2}`,
-					card1: { rank: r, suit: s1 },
-					card2: { rank: r, suit: s2 },
-					label: `${r}${s1}${r}${s2}`,
-				});
-			}
-		}
-		return cacheHandCombos(hand, combos);
-	}
 
-	const r1 = hand[0];
-	const r2 = hand[1];
-	const isSuited = hand.endsWith("s");
-
-	if (isSuited) {
-		return cacheHandCombos(hand, SUITS.map((s) => ({
-			id: `${r1}${s}${r2}${s}`,
-			card1: { rank: r1, suit: s },
-			card2: { rank: r2, suit: s },
-			label: `${r1}${s}${r2}${s}`,
-		})));
-	}
-
-	// Offsuit: 12 combos
-	const combos = [];
-	for (const s1 of SUITS) {
-		for (const s2 of SUITS) {
-			if (s1 !== s2) {
-				combos.push({
-					id: `${r1}${s1}${r2}${s2}`,
-					card1: { rank: r1, suit: s1 },
-					card2: { rank: r2, suit: s2 },
-					label: `${r1}${s1}${r2}${s2}`,
-				});
-			}
-		}
-	}
-	return cacheHandCombos(hand, combos);
+	const [r1, r2] = hand;
+	const combos = suitPairsFor(getHandType(hand)).map(([s1, s2]) => ({
+		id: `${r1}${s1}${r2}${s2}`,
+		card1: { rank: r1, suit: s1 },
+		card2: { rank: r2, suit: s2 },
+	}));
+	handComboCache.set(hand, combos);
+	return combos;
 }
 
 function expand(token) {
@@ -121,6 +95,11 @@ function expand(token) {
 	return null;
 }
 
+function addFreq(table, key, action, value) {
+	const row = table[key] || (table[key] = {});
+	row[action] = (row[action] || 0) + value;
+}
+
 export function parseRange(input) {
 	return parseDetailedRange(input).freq;
 }
@@ -138,16 +117,11 @@ export function parseDetailedRange(input) {
 			if (!allActions.includes(action)) allActions.push(action);
 
 			const sub = parseSingleStringWithCombos(strVal, action);
-			for (const [h, actions] of Object.entries(sub.freq)) {
-				if (!freq[h]) freq[h] = {};
-				for (const [act, val] of Object.entries(actions)) {
-					freq[h][act] = (freq[h][act] || 0) + val;
-				}
-			}
-			for (const [cId, actions] of Object.entries(sub.comboFreq)) {
-				if (!comboFreq[cId]) comboFreq[cId] = {};
-				for (const [act, val] of Object.entries(actions)) {
-					comboFreq[cId][act] = (comboFreq[cId][act] || 0) + val;
+			for (const [target, source] of [[freq, sub.freq], [comboFreq, sub.comboFreq]]) {
+				for (const [key, actions] of Object.entries(source)) {
+					for (const [act, val] of Object.entries(actions)) {
+						addFreq(target, key, act, val);
+					}
 				}
 			}
 		}
@@ -159,30 +133,16 @@ export function parseDetailedRange(input) {
 	return { freq: sub.freq, comboFreq: sub.comboFreq, allActions };
 }
 
-function getSolutionRangeCache(solutionData) {
-	if (!solutionData || typeof solutionData !== "object") return null;
-
-	let cache = solutionRangeCaches.get(solutionData);
-	if (!cache) {
-		cache = {
-			strategies: new WeakMap(),
-		};
-		solutionRangeCaches.set(solutionData, cache);
-	}
-	return cache;
-}
-
-export function parseSolutionStrategy(solutionData, strategy) {
+// The first argument is ignored; callers still pass the solution data.
+export function parseSolutionStrategy(_solutionData, strategy) {
 	if (!strategy || typeof strategy !== "object") {
 		return parseDetailedRange(strategy);
 	}
 
-	const cache = getSolutionRangeCache(solutionData)?.strategies;
-	if (!cache) return parseDetailedRange(strategy);
-	if (!cache.has(strategy)) {
-		cache.set(strategy, parseDetailedRange(strategy));
+	if (!strategyCache.has(strategy)) {
+		strategyCache.set(strategy, parseDetailedRange(strategy));
 	}
-	return cache.get(strategy);
+	return strategyCache.get(strategy);
 }
 
 function normalizeComboId(r1, s1, r2, s2) {
@@ -226,14 +186,10 @@ function parseSingleStringWithCombos(str, defaultAction = "raise") {
 				}
 				const isPair = r1 === r2;
 				const hand = isPair ? r1 + r2 : r1 + r2 + (s1 === s2 ? "s" : "o");
-				const total = isPair ? 6 : s1 === s2 ? 4 : 12;
+				const total = comboCount(hand);
 
-				if (!partial[hand]) partial[hand] = {};
-				partial[hand][action] = (partial[hand][action] || 0) + weight / total;
-
-				const normId = normalizeComboId(r1, s1, r2, s2);
-				if (!comboFreq[normId]) comboFreq[normId] = {};
-				comboFreq[normId][action] = (comboFreq[normId][action] || 0) + weight;
+				addFreq(partial, hand, action, weight / total);
+				addFreq(comboFreq, normalizeComboId(r1, s1, r2, s2), action, weight);
 				continue;
 			}
 
@@ -243,13 +199,9 @@ function parseSingleStringWithCombos(str, defaultAction = "raise") {
 				continue;
 			}
 			for (const h of hands) {
-				if (!freq[h]) freq[h] = {};
-				freq[h][action] = (freq[h][action] || 0) + weight;
-
-				const combos = getCombosForHand(h);
-				for (const cmb of combos) {
-					if (!comboFreq[cmb.id]) comboFreq[cmb.id] = {};
-					comboFreq[cmb.id][action] = (comboFreq[cmb.id][action] || 0) + weight;
+				addFreq(freq, h, action, weight);
+				for (const cmb of getCombosForHand(h)) {
+					addFreq(comboFreq, cmb.id, action, weight);
 				}
 			}
 		}

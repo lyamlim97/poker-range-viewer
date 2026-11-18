@@ -6,70 +6,50 @@ import PreflopNav from "./components/PreflopNav";
 import SolutionModal from "./components/SolutionModal";
 import TreeValidation from "./components/TreeValidation";
 import { parseSolutionStrategy } from "./utils/parseRange";
+import { getSolutionNodes, getNodeStrategy, RARE_TAG } from "./utils/solutionAccessors";
 import {
-	POSITIONS_6MAX,
 	getActionablePositions,
 	getNextPosition,
-	getSolutionNodes,
-	getSolutionNodeStrategy,
 	isActionPathValid,
 	resolveSpotFromSolution,
 } from "./utils/preflopTree";
+import { POSITIONS_6MAX } from "./utils/positions";
+import {
+	EMPTY_SOLUTION_INDEX,
+	EMPTY_SOLUTION_URLS,
+	fetchSolutionJson,
+	getSolutionAssetUrl,
+} from "./utils/solutionLoader";
+import { copyTextToClipboard, yieldToBrowser } from "./utils/download";
 import "./App.css";
 
-const EMPTY_SOLUTION_INDEX = [];
-const EMPTY_SOLUTION_URLS = {};
-
-function yieldToBrowser() {
-	return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function copyTextToClipboard(text) {
-	try {
-		if (navigator.clipboard?.writeText) {
-			await navigator.clipboard.writeText(text);
-			return true;
-		}
-	} catch {
-		// Fall through to the browser-compatible copy fallback.
-	}
-
-	const textarea = document.createElement("textarea");
-	textarea.value = text;
-	textarea.setAttribute("readonly", "");
-	textarea.style.position = "fixed";
-	textarea.style.opacity = "0";
-	document.body.appendChild(textarea);
-	textarea.select();
-	const copied = document.execCommand("copy");
-	textarea.remove();
-	return copied;
-}
+const makeLoadState = (solutionKey, attempt, urls, phase = "loading", extra = {}) => ({
+	solutionKey,
+	attempt,
+	urls,
+	phase,
+	progress: 0,
+	parsedNodes: 0,
+	totalNodes: 0,
+	error: null,
+	...extra,
+});
 
 export default function RangeViewer({
 	solutionIndex = EMPTY_SOLUTION_INDEX,
 	solutionUrls = EMPTY_SOLUTION_URLS,
 }) {
-	const availableSolutions = solutionIndex;
-
 	const [selectedSolutionKey, setSelectedSolutionKey] = useState(
-		() => availableSolutions[0]?.id
+		() => solutionIndex[0]?.id
 	);
 	const selectedSolution =
-		availableSolutions.find((solution) => solution.id === selectedSolutionKey) ||
-		availableSolutions[0];
+		solutionIndex.find((solution) => solution.id === selectedSolutionKey) ||
+		solutionIndex[0];
 	const [isSolutionModalOpen, setIsSolutionModalOpen] = useState(false);
 	const [loadAttempt, setLoadAttempt] = useState(0);
-	const [loadState, setLoadState] = useState({
-		solutionKey: availableSolutions[0]?.id,
-		attempt: 0,
-		urls: solutionUrls,
-		phase: "loading",
-		progress: 0,
-		parsedNodes: 0,
-		totalNodes: 0,
-		error: null,
-	});
+	const [loadState, setLoadState] = useState(() =>
+		makeLoadState(solutionIndex[0]?.id, 0, solutionUrls)
+	);
 	const loadStateMatchesSelection =
 		loadState.solutionKey === selectedSolutionKey &&
 		loadState.attempt === loadAttempt &&
@@ -80,7 +60,7 @@ export default function RangeViewer({
 			: null;
 	// The action path is chronological so a position can act more than once.
 	const [activePosition, setActivePosition] = useState(
-		() => availableSolutions[0]?.rootPosition || "EP"
+		() => solutionIndex[0]?.rootPosition || "EP"
 	);
 	const [actionPath, setActionPath] = useState([]);
 	const [selectedHand, setSelectedHand] = useState("AA");
@@ -98,9 +78,7 @@ export default function RangeViewer({
 		let cancelled = false;
 		const controller = new AbortController();
 		const solutionKey = selectedSolution?.id;
-		const assetUrl = solutionKey
-			? solutionUrls[`./data/solutions/${solutionKey}.json`]
-			: null;
+		const assetUrl = getSolutionAssetUrl(solutionUrls, solutionKey);
 
 		async function loadSelectedSolution() {
 			try {
@@ -110,55 +88,36 @@ export default function RangeViewer({
 					);
 				}
 
-				const response = await fetch(assetUrl, {
-					cache: "no-cache",
+				const solutionData = await fetchSolutionJson(assetUrl, {
 					signal: controller.signal,
 				});
-				if (!response.ok) {
-					throw new Error(`The solution file could not be loaded (HTTP ${response.status}).`);
-				}
-
-				const solutionData = await response.json();
-				if (!solutionData || typeof solutionData !== "object") {
-					throw new Error("The solution file must contain a JSON object.");
-				}
 				if (cancelled) return;
 
 				const nodes = getSolutionNodes(solutionData) || {};
 				const entries = Object.entries(nodes);
-				setLoadState({
-					solutionKey,
-					attempt: loadAttempt,
-					urls: solutionUrls,
-					phase: "parsing",
-					progress: entries.length === 0 ? 100 : 0,
-					parsedNodes: 0,
-					totalNodes: entries.length,
-					error: null,
-				});
+				setLoadState(
+					makeLoadState(solutionKey, loadAttempt, solutionUrls, "parsing", {
+						progress: entries.length === 0 ? 100 : 0,
+						totalNodes: entries.length,
+					})
+				);
 				await yieldToBrowser();
 
 				for (let index = 0; index < entries.length; index += 1) {
 					if (cancelled) return;
 					const node = entries[index][1];
 					if (node && typeof node === "object") {
-						parseSolutionStrategy(
-							solutionData,
-							getSolutionNodeStrategy(node)
-						);
+						parseSolutionStrategy(solutionData, getNodeStrategy(node));
 					}
 
 					const parsedNodes = index + 1;
-					setLoadState({
-						solutionKey,
-						attempt: loadAttempt,
-						urls: solutionUrls,
-						phase: "parsing",
-						progress: Math.round((parsedNodes / entries.length) * 100),
-						parsedNodes,
-						totalNodes: entries.length,
-						error: null,
-					});
+					setLoadState(
+						makeLoadState(solutionKey, loadAttempt, solutionUrls, "parsing", {
+							progress: Math.round((parsedNodes / entries.length) * 100),
+							parsedNodes,
+							totalNodes: entries.length,
+						})
+					);
 					await yieldToBrowser();
 				}
 
@@ -186,29 +145,21 @@ export default function RangeViewer({
 					setActionPath([]);
 				}
 				reloadSnapshotRef.current = null;
-				setLoadState({
-					solutionKey,
-					attempt: loadAttempt,
-					urls: solutionUrls,
-					phase: "ready",
-					progress: 100,
-					parsedNodes: entries.length,
-					totalNodes: entries.length,
-					data: solutionData,
-					error: null,
-				});
+				setLoadState(
+					makeLoadState(solutionKey, loadAttempt, solutionUrls, "ready", {
+						progress: 100,
+						parsedNodes: entries.length,
+						totalNodes: entries.length,
+						data: solutionData,
+					})
+				);
 			} catch (error) {
-				if (cancelled) return;
-				setLoadState({
-					solutionKey,
-					attempt: loadAttempt,
-					urls: solutionUrls,
-					phase: "error",
-					progress: 0,
-					parsedNodes: 0,
-					totalNodes: 0,
-					error: error instanceof Error ? error.message : String(error),
-				});
+				if (cancelled || error.name === "AbortError") return;
+				setLoadState(
+					makeLoadState(solutionKey, loadAttempt, solutionUrls, "error", {
+						error: error instanceof Error ? error.message : String(error),
+					})
+				);
 			}
 		}
 
@@ -228,16 +179,7 @@ export default function RangeViewer({
 			activePosition,
 			nextPosition: getNextPosition(actionPath, currentRangesData),
 		};
-		setLoadState({
-			solutionKey: selectedSolutionKey,
-			attempt: nextAttempt,
-			urls: solutionUrls,
-			phase: "loading",
-			progress: 0,
-			parsedNodes: 0,
-			totalNodes: 0,
-			error: null,
-		});
+		setLoadState(makeLoadState(selectedSolutionKey, nextAttempt, solutionUrls));
 		setLoadAttempt(nextAttempt);
 	};
 
@@ -299,7 +241,7 @@ export default function RangeViewer({
 	const scenario = useMemo(() => {
 		return resolveSpotFromSolution(activePosition, actionPath, currentRangesData);
 	}, [activePosition, actionPath, currentRangesData]);
-	const hasUnsavedRareStrategy = scenario?.tags?.includes("almost-never-reached") === true;
+	const hasUnsavedRareStrategy = scenario?.tags?.includes(RARE_TAG) === true;
 	const handleCopyNodeId = async () => {
 		if (!scenario?.nodeId) return;
 		const copied = await copyTextToClipboard(scenario.nodeId);
@@ -333,21 +275,12 @@ export default function RangeViewer({
 		<SolutionModal
 			isOpen={isSolutionModalOpen}
 			onClose={() => setIsSolutionModalOpen(false)}
-			solutions={availableSolutions}
+			solutions={solutionIndex}
 			currentSolutionId={selectedSolution?.id}
 			onSelectSolution={(solution) => {
 				reloadSnapshotRef.current = null;
 				if (solution.id !== selectedSolutionKey) {
-					setLoadState({
-						solutionKey: solution.id,
-						attempt: loadAttempt,
-						urls: solutionUrls,
-						phase: "loading",
-						progress: 0,
-						parsedNodes: 0,
-						totalNodes: 0,
-						error: null,
-					});
+					setLoadState(makeLoadState(solution.id, loadAttempt, solutionUrls));
 				}
 				setSelectedSolutionKey(solution.id);
 				setActivePosition(solution.rootPosition || "EP");
@@ -415,9 +348,7 @@ export default function RangeViewer({
 				onSelectPosition={handleSelectPosition}
 				actionPath={actionPath}
 				actionablePositions={getActionablePositions(actionPath, currentRangesData)}
-				onSelectAction={(index, position, action) =>
-					handleSelectAction(index, position, action)
-				}
+				onSelectAction={handleSelectAction}
 				isTerminal={scenario?.terminal}
 				isStrategyUnavailable={hasUnsavedRareStrategy}
 				onChangeSolution={() => setIsSolutionModalOpen(true)}

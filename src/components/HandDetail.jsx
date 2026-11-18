@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { actionColor } from "../utils/actions";
 import { getCombosForHand } from "../utils/parseRange";
+import { getHandType } from "../utils/hands";
+
+const TYPE_LABELS = { pair: "Pair", suited: "Suited", offsuit: "Offsuit" };
 
 const SUIT_ICONS = {
 	s: "♠",
@@ -33,7 +36,7 @@ export default function HandDetail({
 	}
 
 	const combos = getCombosForHand(hand);
-	const type = hand.length === 2 ? "Pair" : hand.endsWith("s") ? "Suited" : "Offsuit";
+	const type = getHandType(hand);
 	const maxCombos = combos.length;
 
 	// Calculate hand-level total frequencies
@@ -46,7 +49,7 @@ export default function HandDetail({
 				<div className="rv-hd-title">
 					<span className="rv-hd-hand-name">{hand}</span>
 					<span className="rv-hd-hand-type">
-						{type} · {maxCombos} combos
+						{TYPE_LABELS[type]} · {maxCombos} combos
 					</span>
 				</div>
 				<div className="rv-hd-tabs">
@@ -66,11 +69,7 @@ export default function HandDetail({
 			</div>
 
 			{activeTab === "hands" ? (
-				<div
-					className={`rv-combos-grid ${
-						type === "Suited" ? "suited" : type === "Pair" ? "pair" : "offsuit"
-					}`}
-				>
+				<div className={`rv-combos-grid ${type}`}>
 					{combos.map((combo) => {
 						// Retrieve specific combo actions if available, else hand actions
 						const actionsForCombo = (comboFreq && comboFreq[combo.id]) || handActions || {};

@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-	getActionLabel,
+	actionColor,
 	getOrderedActions,
 	getRangeClass,
 	getRangeStatus,
-} from "../utils/actionHelpers";
-import { actionColor } from "../utils/actions";
+} from "../utils/actions";
+import {
+	getActionLabel,
+	getActionTarget,
+	getNodeActions,
+	isRareAction,
+	isTerminalAction,
+} from "../utils/solutionAccessors";
+import { getNodeIdPosition } from "../utils/nodeId";
 import {
 	HEADER_HEIGHT,
 	NODE_WIDTH,
@@ -20,6 +27,8 @@ const MAX_ZOOM = 2;
 const DRAG_THRESHOLD = 4;
 
 const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+
+const nodeHeight = (node) => getNodeHeight(getNodeActions(node).length);
 
 function loadPositions(storageKey) {
 	try {
@@ -71,7 +80,7 @@ export default function DagCanvas({
 			let maxY = -Infinity;
 			for (const id of ids) {
 				const position = layout?.[id] || getPosition(id);
-				const height = getNodeHeight(nodes[id]?.actions?.length || 0);
+				const height = nodeHeight(nodes[id]);
 				minX = Math.min(minX, position.x);
 				minY = Math.min(minY, position.y);
 				maxX = Math.max(maxX, position.x + NODE_WIDTH);
@@ -92,8 +101,8 @@ export default function DagCanvas({
 	);
 
 	useLayoutEffect(() => {
-		fitView();
 		// Fit once when a solution is first shown; later edits must not move the camera.
+		fitView();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -124,7 +133,7 @@ export default function DagCanvas({
 		const container = containerRef.current;
 		if (!container) return;
 		const position = getPosition(id);
-		const height = getNodeHeight(nodes[id]?.actions?.length || 0);
+		const height = nodeHeight(nodes[id]);
 		const rect = container.getBoundingClientRect();
 		setView((current) => ({
 			...current,
@@ -162,16 +171,13 @@ export default function DagCanvas({
 			drag.active = true;
 		}
 		if (drag.id) {
-			setPositions((current) => {
-				const next = {
-					...current,
-					[drag.id]: {
-						x: drag.origin.x + dx / drag.zoom,
-						y: drag.origin.y + dy / drag.zoom,
-					},
-				};
-				return next;
-			});
+			setPositions((current) => ({
+				...current,
+				[drag.id]: {
+					x: drag.origin.x + dx / drag.zoom,
+					y: drag.origin.y + dy / drag.zoom,
+				},
+			}));
 		} else {
 			setView((current) => ({ ...current, x: drag.origin.x + dx, y: drag.origin.y + dy }));
 		}
@@ -323,7 +329,7 @@ export default function DagCanvas({
 
 					{nodeIds.map((id) => {
 						const node = nodes[id];
-						const actions = Array.isArray(node?.actions) ? node.actions : [];
+						const actions = getNodeActions(node);
 						const position = getPosition(id);
 						const classes = ["dag-node"];
 						if (id === selectedNodeId) classes.push("selected");
@@ -343,7 +349,7 @@ export default function DagCanvas({
 								}}
 							>
 								<div className="dag-node-header" data-drag-handle title={id}>
-									<strong>{node?.position || id.split("_").pop()}</strong>
+									<strong>{node?.position || getNodeIdPosition(id)}</strong>
 									{solution.rootNodeId === id && <span className="dag-tag">Root</span>}
 									{node?.terminal && <span className="dag-tag muted">End</span>}
 									{problemNodeIds.has(id) && (
@@ -367,25 +373,10 @@ export default function DagCanvas({
 									)}
 									{getOrderedActions(actions).map(({ action, key }) => {
 										const status = getRangeStatus(action, node);
-										const target =
-											action && typeof action === "object"
-												? action.nextNodeId
-												: "";
-										const isTerminalAction =
-											action &&
-											typeof action === "object" &&
-											action.terminal === true;
-										const isRareAction =
-											action &&
-											typeof action === "object" &&
-											Array.isArray(action.tags) &&
-											action.tags.includes("almost-never-reached");
-										const missingNextNode =
-											action &&
-											typeof action === "object" &&
-											!isTerminalAction &&
-											!isRareAction &&
-											!(typeof target === "string" && target.trim());
+										const target = getActionTarget(action);
+										const terminal = isTerminalAction(action);
+										const rare = isRareAction(action);
+										const missingNextNode = !terminal && !rare && !target.trim();
 										return (
 											<div
 												key={key}
@@ -414,7 +405,7 @@ export default function DagCanvas({
 															!
 														</span>
 													)}
-													{isTerminalAction && (
+													{terminal && (
 														<span
 															className="dag-action-badge terminal"
 															title="Terminal action"
@@ -422,7 +413,7 @@ export default function DagCanvas({
 															T
 														</span>
 													)}
-													{isRareAction && (
+													{rare && (
 														<span
 															className="dag-action-badge rare"
 															title="Almost never reached"

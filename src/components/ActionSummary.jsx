@@ -1,22 +1,5 @@
-import { actionColor } from "../utils/actions";
-
-function combosFor(hand) {
-	if (hand.length === 2) return 6;
-	return hand.endsWith("s") ? 4 : 12;
-}
-
-function actionSortKey(action) {
-	const raise = action.match(
-		/^(raise|all[\s-]?in|jam|[345][\s-]?bet|squeeze)\s*([\d.]+)?\s*(?:bb)?/i
-	);
-	if (raise) {
-		const size = Number(raise[2]);
-		return [0, Number.isFinite(size) ? size : /^(all[\s-]?in|jam)/i.test(action) ? Infinity : 0];
-	}
-	if (/^call(?:\s|$)/i.test(action)) return [1, 0];
-	if (/^fold(?:\s|$)/i.test(action)) return [2, 0];
-	return [3, 0];
-}
+import { actionColor, compareActions } from "../utils/actions";
+import { comboCount } from "../utils/hands";
 
 export default function ActionSummary({ freq = {} }) {
 	const actions = {};
@@ -26,7 +9,7 @@ export default function ActionSummary({ freq = {} }) {
 	}
 
 	for (const [hand, handActions] of Object.entries(freq)) {
-		const max = combosFor(hand);
+		const max = comboCount(hand);
 		for (const [action, frequency] of Object.entries(handActions)) {
 			if (frequency <= 0) continue;
 			if (!actions[action]) actions[action] = { combos: 0 };
@@ -34,11 +17,7 @@ export default function ActionSummary({ freq = {} }) {
 		}
 	}
 
-	const entries = Object.entries(actions).sort(([a], [b]) => {
-		const [aGroup, aSize] = actionSortKey(a);
-		const [bGroup, bSize] = actionSortKey(b);
-		return aGroup - bGroup || bSize - aSize;
-	});
+	const entries = Object.entries(actions).sort(([a], [b]) => compareActions(a, b));
 	const totalCombos = entries.reduce((sum, [, { combos }]) => sum + combos, 0);
 
 	if (entries.length === 0) {

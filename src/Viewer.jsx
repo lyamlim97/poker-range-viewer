@@ -1,11 +1,14 @@
 import { useState, useMemo } from "react";
-import { FlaggedContext, checkRangeConsistency, findFlaggedSpots } from "./utils/checkRange";
+import { checkRangeConsistency } from "./utils/checkRange";
+import { FlaggedContext, SPOT_SEPARATOR, findFlaggedSpots } from "./utils/flaggedSpots";
 
 import Section from "./components/Section";
 import SpotSection from "./components/SpotSection";
 import RangeGrid from "./components/RangeGrid";
 import { parseRange } from "./utils/parseRange";
 import { actionColor } from "./utils/actions";
+import { downloadJson } from "./utils/download";
+import { describeRangeCheck, summarizeHands } from "./utils/reports";
 import "./App.css";
 
 const SECTIONS = ["RFI", "BB def", "vs 3Bet/5Bet", "3Bet/5Bet"];
@@ -13,10 +16,10 @@ const SECTIONS = ["RFI", "BB def", "vs 3Bet/5Bet", "3Bet/5Bet"];
 const Pos = ({ children }) => <span className="pos">{children}</span>;
 const Dim = ({ children }) => <span className="dim">{children}</span>;
 
-const getNestedValue = (obj, path) => path.split(" > ").reduce((acc, key) => acc?.[key], obj);
+const getNestedValue = (obj, path) => path.split(SPOT_SEPARATOR).reduce((acc, key) => acc?.[key], obj);
 
 const setNestedValue = (obj, path, value) => {
-	const keys = path.split(" > ");
+	const keys = path.split(SPOT_SEPARATOR);
 	const lastKey = keys.pop();
 	const target = keys.reduce((acc, key) => {
 		if (!acc[key]) acc[key] = {};
@@ -27,7 +30,7 @@ const setNestedValue = (obj, path, value) => {
 
 function getHeading(id) {
 	if (!id) return "Pick a scenario";
-	const [section, a, b, c] = id.split(" > ");
+	const [section, a, b, c] = id.split(SPOT_SEPARATOR);
 
 	switch (section) {
 		case "RFI":
@@ -53,23 +56,17 @@ function getHeading(id) {
 	}
 }
 
-const summary = (items) => {
-	const shown = items
-		.slice(0, 8)
-		.map(({ hand, total }) => `${hand} ${+(total * 100).toFixed(1)}%`)
-		.join(", ");
-	return items.length > 8 ? `${shown} +${items.length - 8} more` : shown;
-};
-
 function RangeCheck({ empty, over, under }) {
-	if (empty) return <p className="range-check muted">No hands entered for this scenario yet</p>;
-	if (!over.length && !under.length) {
-		return <p className="range-check ok">✓ Every hand adds up to 100%</p>;
-	}
+	const { tone, text } = describeRangeCheck(
+		{ kind: "100", empty, over, under },
+		{ emptyText: "No hands entered for this scenario yet" }
+	);
+	if (tone === "muted") return <p className="range-check muted">{text}</p>;
+	if (tone === "ok") return <p className="range-check ok">{text}</p>;
 	return (
 		<div className="range-check warn">
-			{over.length > 0 && <p><b>{over.length} over 100%:</b> {summary(over)}</p>}
-			{under.length > 0 && <p><b>{under.length} under 100%:</b> {summary(under)}</p>}
+			{over.length > 0 && <p><b>{over.length} over 100%:</b> {summarizeHands(over)}</p>}
+			{under.length > 0 && <p><b>{under.length} under 100%:</b> {summarizeHands(under)}</p>}
 		</div>
 	);
 }
@@ -107,20 +104,12 @@ export default function Viewer({ initialRanges, fileName }) {
 	const handleRangeChange = (action, value) => {
 		setRangesData((prev) => {
 			const updated = structuredClone(prev);
-			setNestedValue(updated, `${selected} > ${action}`, value);
+			setNestedValue(updated, `${selected}${SPOT_SEPARATOR}${action}`, value);
 			return updated;
 		});
 	};
 
-	const handleDownloadJson = () => {
-		const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rangesData, null, "\t"));
-		const a = document.createElement("a");
-		a.setAttribute("href", dataStr);
-		a.setAttribute("download", fileName);
-		document.body.appendChild(a);
-		a.click();
-		a.remove();
-	};
+	const handleDownloadJson = () => downloadJson(rangesData, fileName);
 
 	return (
 		<FlaggedContext.Provider value={flagged}>

@@ -1,40 +1,41 @@
-import { getOrderedActions } from "./actionHelpers";
+import {
+	getActionAmount,
+	getOrderedActions,
+	isAggressive,
+	isAllIn,
+	isCall,
+	isFold,
+} from "./actions";
 import { getPositionRangeReference } from "./checkRange";
+import { getNodeIdPosition, parseNodeId } from "./nodeId";
+import { POSITIONS, POSITION_IDS, getSeat, normalizeActionPath } from "./positions";
+import {
+	RARE_TAG,
+	findNodeAction,
+	getActionLabel,
+	getActionOutcome,
+	getActionTarget,
+	getNodeActions,
+	getNodeStrategy,
+	getRootNodeId,
+	getSolutionNodes,
+} from "./solutionAccessors";
 
-export const POSITIONS_6MAX = [
-	{ id: "EP", defaultStack: 100 },
-	{ id: "MP", defaultStack: 100 },
-	{ id: "CO", defaultStack: 100 },
-	{ id: "BU", defaultStack: 100 },
-	{ id: "SB", defaultStack: 99.5 },
-	{ id: "BB", defaultStack: 99 },
-];
-
-const POSITION_IDS = POSITIONS_6MAX.map(({ id }) => id);
-const nodeStrategyCache = new WeakMap();
 const EMPTY_STRATEGY = {};
 
 function getRootFoldHistory(solutionData) {
-	const rootNodeId = solutionData?.rootNodeId || solutionData?.tree?.root;
-	if (!rootNodeId) return [];
-
-	const parts = rootNodeId.split("_");
-	const history = [];
-	for (let index = 0; index < parts.length - 1; index += 2) {
-		const position = parts[index];
-		if (!POSITION_IDS.includes(position) || parts[index + 1] !== "F") return [];
-		history.push({ position, action: "Fold" });
-	}
-	return history;
+	const parsed = parseNodeId(getRootNodeId(solutionData));
+	if (!parsed || parsed.history.some(({ actionToken }) => actionToken !== "F")) return [];
+	return parsed.history.map(({ position }) => ({ position, action: "Fold" }));
 }
 
 function getNodePosition(node) {
-	const nodeIdPosition = node?.nodeId?.split("_").pop();
-	const inferredPosition = POSITION_IDS.includes(nodeIdPosition) ? nodeIdPosition : null;
+	const nodeIdPosition = getNodeIdPosition(node?.nodeId);
+	const inferredPosition = POSITION_IDS.has(nodeIdPosition) ? nodeIdPosition : null;
 	const declaredPosition = node?.position;
 	const hasDeclaredPosition = node?.position != null;
 
-	if (hasDeclaredPosition && !POSITION_IDS.includes(declaredPosition)) {
+	if (hasDeclaredPosition && !POSITION_IDS.has(declaredPosition)) {
 		throw new Error(
 			`Solution node "${node.nodeId}" has an invalid position "${node.position}".`
 		);
@@ -46,42 +47,11 @@ function getNodePosition(node) {
 		);
 	}
 
-	return inferredPosition || (POSITION_IDS.includes(declaredPosition) ? declaredPosition : null);
+	return inferredPosition || (POSITION_IDS.has(declaredPosition) ? declaredPosition : null);
 }
 
 function hasNoSavedStrategy(node) {
 	return node?.strategyUnavailable === true;
-}
-
-export function normalizeActionPath(actionHistory = {}) {
-	if (Array.isArray(actionHistory)) {
-		return actionHistory
-			.filter((event) => event && POSITION_IDS.includes(event.position) && event.action)
-			.map((event) => ({
-				position: event.position,
-				action: String(event.action),
-			}));
-	}
-
-	return POSITIONS_6MAX.flatMap(({ id }) => {
-		const action = actionHistory[id];
-		return action ? [{ position: id, action: String(action) }] : [];
-	});
-}
-
-export function isAggressiveAction(action = "") {
-	return /^(raise|all[\s-]?in|jam|[345][\s-]?bet|squeeze)/i.test(action);
-}
-
-function isAllInAction(action = "") {
-	return /^(all[\s-]?in|jam)/i.test(action);
-}
-
-function actionAmount(action = "") {
-	const match = action.match(/([\d.]+)\s*(?:bb)?\s*$/i);
-	if (!match) return null;
-	const amount = Number(match[1]);
-	return Number.isFinite(amount) ? amount : null;
 }
 
 function formatSize(size) {
@@ -92,22 +62,22 @@ function getHandState(actionHistory = {}) {
 	const path = normalizeActionPath(actionHistory);
 	const folded = new Set();
 	const allIn = new Set();
-	const pending = new Set(POSITION_IDS);
+	const pending = new Set(POSITIONS);
 	const raises = [];
 
 	for (const { position, action } of path) {
 		pending.delete(position);
-		if (/^fold\b/i.test(action)) folded.add(position);
-		if (isAllInAction(action)) allIn.add(position);
+		if (isFold(action)) folded.add(position);
+		if (isAllIn(action)) allIn.add(position);
 
-		const lastRaiseAmount = actionAmount(raises[raises.length - 1]?.action);
-		const currentAmount = actionAmount(action);
-		const isRaise = isAllInAction(action)
+		const lastRaiseAmount = getActionAmount(raises[raises.length - 1]?.action);
+		const currentAmount = getActionAmount(action);
+		const isRaise = isAllIn(action)
 			? currentAmount === null || currentAmount > (lastRaiseAmount || 0)
-			: isAggressiveAction(action);
+			: isAggressive(action);
 		if (isRaise) {
 			raises.push({ position, action });
-			for (const id of POSITION_IDS) {
+			for (const id of POSITIONS) {
 				if (id === position || folded.has(id) || allIn.has(id)) {
 					pending.delete(id);
 				} else {
@@ -119,7 +89,7 @@ function getHandState(actionHistory = {}) {
 
 	for (const id of folded) pending.delete(id);
 	for (const id of allIn) pending.delete(id);
-	if (POSITION_IDS.filter((id) => !folded.has(id)).length <= 1) pending.clear();
+	if (POSITIONS.filter((id) => !folded.has(id)).length <= 1) pending.clear();
 
 	return { path, folded, allIn, pending, raises };
 }
@@ -130,9 +100,7 @@ export function getActionablePositions(actionHistory = {}, solutionData = null) 
 
 	const path = [...getRootFoldHistory(solutionData), ...normalizeActionPath(actionHistory)];
 	const { pending, folded, allIn } = getHandState(path);
-	return POSITIONS_6MAX
-		.map(({ id }) => id)
-		.filter((id) => pending.has(id) && !folded.has(id) && !allIn.has(id));
+	return POSITIONS.filter((id) => pending.has(id) && !folded.has(id) && !allIn.has(id));
 }
 
 export function getNextPosition(actionHistory = {}, solutionData = null) {
@@ -146,9 +114,9 @@ export function getNextPosition(actionHistory = {}, solutionData = null) {
 	if (path.length === 0) return "EP";
 
 	const { pending, folded, allIn } = getHandState(path);
-	const lastIndex = POSITION_IDS.indexOf(path[path.length - 1].position);
-	for (let offset = 1; offset <= POSITION_IDS.length; offset++) {
-		const candidate = POSITION_IDS[(lastIndex + offset) % POSITION_IDS.length];
+	const lastIndex = POSITIONS.indexOf(path[path.length - 1].position);
+	for (let offset = 1; offset <= POSITIONS.length; offset++) {
+		const candidate = POSITIONS[(lastIndex + offset) % POSITIONS.length];
 		if (pending.has(candidate) && !folded.has(candidate) && !allIn.has(candidate)) {
 			return candidate;
 		}
@@ -156,10 +124,10 @@ export function getNextPosition(actionHistory = {}, solutionData = null) {
 	return null;
 }
 
-export function analyzeActionHistory(actionHistory = {}) {
+function analyzeActionHistory(actionHistory = {}) {
 	const { path, raises } = getHandState(actionHistory);
 	const callers = path
-		.filter(({ action }) => /^call\b/i.test(action))
+		.filter(({ action }) => isCall(action))
 		.map(({ position }) => position);
 
 	return {
@@ -176,58 +144,9 @@ export function analyzeActionHistory(actionHistory = {}) {
 	};
 }
 
-export function getSolutionNodes(solutionData) {
-	const nodes = solutionData?.nodes || solutionData?.tree?.nodes;
-	if (Array.isArray(nodes)) {
-		return Object.fromEntries(nodes.filter((node) => node?.nodeId).map((node) => [node.nodeId, node]));
-	}
-	return nodes || null;
-}
-
-function getNodeActions(node) {
-	return Array.isArray(node?.actions) ? node.actions : [];
-}
-
-function getActionLabel(action) {
-	return typeof action === "string" ? action : action?.label;
-}
-
-function getActionRange(action, node) {
-	const label = getActionLabel(action);
-	const range =
-		typeof action === "object" && action !== null
-			? action.rawRangeText ?? node.strategy?.[label]
-			: node.strategy?.[label];
-	return typeof range === "string" ? range : null;
-}
-
-export function getSolutionNodeStrategy(node) {
-	if (nodeStrategyCache.has(node)) return nodeStrategyCache.get(node);
-
-	const strategy = Object.fromEntries(
-		getNodeActions(node)
-			.map((action) => {
-				const label = getActionLabel(action);
-				const range = getActionRange(action, node);
-				return typeof label === "string" && typeof range === "string"
-					? [label, range]
-					: null;
-			})
-			.filter(Boolean)
-	);
-	nodeStrategyCache.set(node, strategy);
-	return strategy;
-}
-
-function findNodeAction(node, action) {
-	return getNodeActions(node).find(
-		(option) => getActionLabel(option) === action || option?.id === action
-	);
-}
-
-function resolveTreeNode(solutionData, actionHistory, onTransition) {
+function resolveTreeNode(solutionData, actionHistory) {
 	const nodes = getSolutionNodes(solutionData);
-	const rootNodeId = solutionData?.rootNodeId || solutionData?.tree?.root;
+	const rootNodeId = getRootNodeId(solutionData);
 	if (!rootNodeId || !nodes) return null;
 
 	let node = nodes[rootNodeId];
@@ -237,25 +156,20 @@ function resolveTreeNode(solutionData, actionHistory, onTransition) {
 		const nodePosition = getNodePosition(node);
 		if (nodePosition && nodePosition !== event.position) return null;
 		const option = findNodeAction(node, event.action);
-		onTransition?.(node, event, option);
-		const nextId =
-			(typeof option === "object" ? option.nextNodeId : null) ??
-			node.next?.[event.action] ??
-			node.children?.[event.action];
-		if (typeof option === "object" && option?.terminal === true) {
+		const outcome = getActionOutcome(option);
+		if (outcome === "terminal") {
 			node = { terminal: true, actions: [] };
 			continue;
 		}
-		if (option?.tags?.includes("almost-never-reached") === true) {
+		if (outcome === "rare") {
 			node = {
-				tags: ["almost-never-reached"],
+				tags: [RARE_TAG],
 				strategyUnavailable: true,
 				actions: [],
 			};
 			continue;
 		}
-		if (!nextId) return null;
-		node = typeof nextId === "string" ? nodes[nextId] : nextId;
+		node = nodes[getActionTarget(option)];
 		if (!node) return null;
 	}
 
@@ -276,55 +190,18 @@ export function isActionPathValid(actionHistory, solutionData) {
 	}
 }
 
-function getPreviousActionReference(solutionData, actionHistory, position) {
-	const previous = getPositionRangeReference(solutionData, {
-		actionHistory,
-		position,
-	});
-	return previous
-		? { range: previous.range, action: previous.action }
-		: null;
-}
-
-function resolveSpot(solutionData, position, actionHistory) {
-	const spotMap = solutionData?.spots?.[position];
-	if (!spotMap) return null;
-
-	const { path, raises } = analyzeActionHistory(actionHistory);
-	if (raises.length === 0) return spotMap.open || null;
-
-	const aggressor = raises[raises.length - 1].position;
-	if (raises.length === 1) {
-		const raiseIndex = path.findIndex(
-			(event) => event.position === aggressor && isAggressiveAction(event.action)
-		);
-		const callers = path
-			.slice(raiseIndex + 1)
-			.filter(({ action }) => /^call\b/i.test(action));
-		const caller = callers[callers.length - 1];
-		const callSpot = caller && spotMap["vs Open after Call"]?.[caller.position];
-		return callSpot || spotMap["vs Open"]?.[aggressor] || null;
-	}
-
-	const betLevel = raises.length + 1;
-	return spotMap[`vs ${betLevel}Bet`]?.[aggressor] || null;
-}
-
 function defaultActions(position, actionHistory, openSize) {
-	const { path, raises } = analyzeActionHistory(actionHistory);
+	const { raises } = analyzeActionHistory(actionHistory);
 	const lastRaise = raises[raises.length - 1];
 	const allIn = "Allin 100";
 
 	if (raises.length === 0) {
 		if (position === "SB") return ["Fold", "Call", "Raise 3", allIn];
-		if (position === "BB" && path.some(({ position: actor, action }) => actor === "SB" && /^call\b/i.test(action))) {
-			return ["Check", `Raise ${openSize}`, allIn];
-		}
 		if (position === "BB") return ["Check", `Raise ${openSize}`, allIn];
 		return ["Fold", `Raise ${openSize}`, allIn];
 	}
 
-	const lastSize = actionAmount(lastRaise.action) || parseFloat(openSize) || 2;
+	const lastSize = getActionAmount(lastRaise.action) || parseFloat(openSize) || 2;
 	const raiseSize = raises.length === 1 ? lastSize * 3 : lastSize * 2.5;
 	const stackLimit = getMaxRaiseTo(position, actionHistory);
 	const actions = ["Fold", "Call"];
@@ -333,25 +210,26 @@ function defaultActions(position, actionHistory, openSize) {
 	return actions;
 }
 
-function getMaxRaiseTo(position, actionHistory) {
-	const seat = POSITIONS_6MAX.find(({ id }) => id === position);
-	const defaultStack = seat?.defaultStack ?? 100;
-	const remainingStack = computePositionStack(position, actionHistory, defaultStack);
-	const ownEvents = normalizeActionPath(actionHistory).filter(
-		(event) => event.position === position
+function highestRaiseAmount(path) {
+	return path.reduce(
+		(highest, event) =>
+			isAggressive(event.action)
+				? Math.max(highest, getActionAmount(event.action) || 0)
+				: highest,
+		0
 	);
-	const lastOwnAction = ownEvents[ownEvents.length - 1]?.action;
+}
+
+function getMaxRaiseTo(position, actionHistory) {
+	const defaultStack = getSeat(position)?.defaultStack ?? 100;
+	const remainingStack = computePositionStack(position, actionHistory, defaultStack);
 	const path = normalizeActionPath(actionHistory);
-	const currentContribution = isAggressiveAction(lastOwnAction) && !isAllInAction(lastOwnAction)
-		? actionAmount(lastOwnAction) || 0
-		: /^call\b/i.test(lastOwnAction || "")
-			? path.reduce(
-				(highest, event) =>
-					isAggressiveAction(event.action)
-						? Math.max(highest, actionAmount(event.action) || 0)
-						: highest,
-				0
-			)
+	const ownEvents = path.filter((event) => event.position === position);
+	const lastOwnAction = ownEvents[ownEvents.length - 1]?.action;
+	const currentContribution = isAggressive(lastOwnAction) && !isAllIn(lastOwnAction)
+		? getActionAmount(lastOwnAction) || 0
+		: isCall(lastOwnAction || "")
+			? highestRaiseAmount(path)
 			: 0;
 	return remainingStack + currentContribution;
 }
@@ -359,8 +237,8 @@ function getMaxRaiseTo(position, actionHistory) {
 function limitActionsToStack(actions, position, actionHistory) {
 	const maxRaiseTo = getMaxRaiseTo(position, actionHistory);
 	return actions.filter((action) => {
-		if (!isAggressiveAction(action) || isAllInAction(action)) return true;
-		const amount = actionAmount(action);
+		if (!isAggressive(action) || isAllIn(action)) return true;
+		const amount = getActionAmount(action);
 		return amount === null || amount <= maxRaiseTo;
 	});
 }
@@ -374,19 +252,18 @@ function computePotSizeBB(actionHistory) {
 
 	for (const { position, action } of normalizeActionPath(actionHistory)) {
 		const contributed = contributions.get(position) || 0;
-		const amount = actionAmount(action);
+		const amount = getActionAmount(action);
 
-		if (isAllInAction(action)) {
-			const seat = POSITIONS_6MAX.find(({ id }) => id === position);
+		if (isAllIn(action)) {
 			const blind = position === "SB" ? 0.5 : position === "BB" ? 1 : 0;
-			const totalStack = (seat?.defaultStack ?? 100) + blind;
+			const totalStack = (getSeat(position)?.defaultStack ?? 100) + blind;
 			const allInTo = Math.min(amount ?? totalStack, totalStack);
 			contributions.set(position, Math.max(contributed, allInTo));
 			currentBet = Math.max(currentBet, allInTo);
-		} else if (isAggressiveAction(action) && amount !== null) {
+		} else if (isAggressive(action) && amount !== null) {
 			contributions.set(position, Math.max(contributed, amount));
 			currentBet = Math.max(currentBet, amount);
-		} else if (/^call\b/i.test(action)) {
+		} else if (isCall(action)) {
 			contributions.set(position, Math.max(contributed, currentBet));
 		}
 	}
@@ -395,7 +272,7 @@ function computePotSizeBB(actionHistory) {
 	return Number(potSize.toFixed(2));
 }
 
-export function computePositionActions(
+function computePositionActions(
 	posId,
 	actionHistory = {},
 	openSize = "2",
@@ -407,11 +284,6 @@ export function computePositionActions(
 	if (node && getNodePosition(node) === position) {
 		const actions = getNodeActions(node).map(getActionLabel).filter(Boolean);
 		return limitActionsToStack(actions, position, actionHistory);
-	}
-
-	const spot = resolveSpot(solutionData, position, actionHistory);
-	if (Array.isArray(spot?.actions)) {
-		return limitActionsToStack(spot.actions, position, actionHistory);
 	}
 
 	return limitActionsToStack(
@@ -431,11 +303,10 @@ export function computePositionActionOptions(
 	const node = resolveTreeNode(solutionData, actionHistory);
 	if (hasNoSavedStrategy(node)) return [];
 	if (node && getNodePosition(node) === position) {
-		const actions = getNodeActions(node).map((action) =>
-			typeof action === "string"
-				? { id: action, label: action }
-				: { id: action.id || action.label, label: action.label }
-		);
+		const actions = getNodeActions(node).map((action) => ({
+			id: action.id || action.label,
+			label: action.label,
+		}));
 		const allowed = new Set(
 			limitActionsToStack(actions.map(({ label }) => label), position, actionHistory)
 		);
@@ -459,19 +330,14 @@ export function computePositionStack(posId, actionHistory = {}, defaultStack = 1
 	const lastEvent = ownEvents[ownEvents.length - 1];
 	if (!lastEvent) return defaultStack;
 
-	if (isAllInAction(lastEvent.action)) return 0;
+	if (isAllIn(lastEvent.action)) return 0;
 
-	if (/^call\b/i.test(lastEvent.action)) {
-		const maxBet = path.reduce((highest, event) => {
-			return isAggressiveAction(event.action)
-				? Math.max(highest, actionAmount(event.action) || 0)
-				: highest;
-		}, 0);
-		return Math.max(0, defaultStack - maxBet);
+	if (isCall(lastEvent.action)) {
+		return Math.max(0, defaultStack - highestRaiseAmount(path));
 	}
 
-	if (isAggressiveAction(lastEvent.action)) {
-		const amount = actionAmount(lastEvent.action);
+	if (isAggressive(lastEvent.action)) {
+		const amount = getActionAmount(lastEvent.action);
 		if (amount !== null) return Math.max(0, defaultStack - amount);
 	}
 
@@ -488,23 +354,18 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 		null;
 	const strategyUnavailable = hasNoSavedStrategy(node);
 	const nodePosition = getNodePosition(node);
-	const previousActionReference =
+	const referenceRange =
 		node && nodePosition === position
-			? getPreviousActionReference(solutionData, actionHistory, position)
+			? getPositionRangeReference(solutionData, { actionHistory, position })?.range
 			: null;
-	const spot = resolveSpot(solutionData, position, actionHistory);
-	const nodeActions = node ? getNodeActions(node).map(getActionLabel).filter(Boolean) : null;
-	const actions =
-		(strategyUnavailable
-			? []
-			: node && nodePosition === position && nodeActions
-			? nodeActions
-			: null) ||
-		(Array.isArray(spot?.actions) ? spot.actions : null) ||
-		defaultActions(position, actionHistory, solutionData?.meta?.openSize || "2");
+	const actions = strategyUnavailable
+		? []
+		: node && nodePosition === position
+			? getNodeActions(node).map(getActionLabel).filter(Boolean)
+			: defaultActions(position, actionHistory, solutionData?.meta?.openSize || "2");
 	const { raises } = analyzeActionHistory(actionHistory);
 	const lastAggressor = raises[raises.length - 1];
-	const defaultTitle = lastAggressor
+	const title = lastAggressor
 		? `${position} vs ${lastAggressor.position} ${raises.length === 1 ? "Open" : `${raises.length + 1}-Bet`}`
 		: `${position} RFI (Open)`;
 	const path = normalizeActionPath(actionHistory)
@@ -513,16 +374,12 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 
 	return {
 		nodeId,
-		title: node?.title || spot?.title || defaultTitle,
+		title,
 		terminal: node?.terminal === true,
 		tags: Array.isArray(node?.tags) ? node.tags : [],
-		referenceRange: previousActionReference?.range || null,
+		referenceRange: referenceRange || null,
 		actions: limitActionsToStack(actions, position, actionHistory),
-		strategy: strategyUnavailable
-			? EMPTY_STRATEGY
-			: node
-				? getSolutionNodeStrategy(node)
-				: spot?.strategy || EMPTY_STRATEGY,
+		strategy: strategyUnavailable || !node ? EMPTY_STRATEGY : getNodeStrategy(node),
 		path: path || `${position} > open`,
 		potSizeBB: computePotSizeBB(actionHistory),
 	};

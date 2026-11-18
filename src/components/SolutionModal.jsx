@@ -1,9 +1,9 @@
 import { useState } from "react";
 import rangeViewerConfig from "../data/range-viewer-config.json";
+import FilterGroup from "./FilterGroup";
 
 const defaultOptions = rangeViewerConfig?.options || {
 	games: ["Cash"],
-	players: ["6max", "Heads-up"],
 	openSizes: ["Any", "2x", "2.3x", "2.5x", "3x"],
 };
 
@@ -15,7 +15,6 @@ export default function SolutionModal({
 	onSelectSolution,
 }) {
 	const [gameFilter, setGameFilter] = useState(rangeViewerConfig?.defaults?.gameFilter || "Cash");
-	const [playerFilter, setPlayerFilter] = useState(rangeViewerConfig?.defaults?.playerFilter || "6max");
 	const [openSizeFilter, setOpenSizeFilter] = useState(rangeViewerConfig?.defaults?.openSizeFilter || "Any");
 
 	if (!isOpen) return null;
@@ -47,50 +46,18 @@ export default function SolutionModal({
 
 				{/* Filter Controls */}
 				<div className="rv-modal-filters">
-					<div className="rv-filter-group">
-						<span className="rv-filter-label">Game</span>
-						<div className="rv-filter-buttons">
-							{(defaultOptions.games || []).map((g) => (
-								<button
-									key={g}
-									className={`rv-fbtn ${gameFilter === g ? "active" : ""}`}
-									onClick={() => setGameFilter(g)}
-								>
-									{g}
-								</button>
-							))}
-						</div>
-					</div>
-
-					<div className="rv-filter-group">
-						<span className="rv-filter-label">Players</span>
-						<div className="rv-filter-buttons">
-							{(defaultOptions.players || []).map((p) => (
-								<button
-									key={p}
-									className={`rv-fbtn ${playerFilter === p ? "active" : ""}`}
-									onClick={() => setPlayerFilter(p)}
-								>
-									{p}
-								</button>
-							))}
-						</div>
-					</div>
-
-					<div className="rv-filter-group">
-						<span className="rv-filter-label">Opening size</span>
-						<div className="rv-filter-buttons">
-							{(defaultOptions.openSizes || []).map((s) => (
-								<button
-									key={s}
-									className={`rv-fbtn ${openSizeFilter === s ? "active" : ""}`}
-									onClick={() => setOpenSizeFilter(s)}
-								>
-									{s}
-								</button>
-							))}
-						</div>
-					</div>
+					<FilterGroup
+						label="Game"
+						options={defaultOptions.games}
+						value={gameFilter}
+						onChange={setGameFilter}
+					/>
+					<FilterGroup
+						label="Opening size"
+						options={defaultOptions.openSizes}
+						value={openSizeFilter}
+						onChange={setOpenSizeFilter}
+					/>
 				</div>
 
 				{/* Solutions Table */}

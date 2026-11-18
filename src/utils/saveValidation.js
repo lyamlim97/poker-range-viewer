@@ -1,3 +1,5 @@
+import { getNodeActions } from "./solutionAccessors.js";
+
 export function validateBasicSolutionStructure(solution) {
 	if (!solution || typeof solution !== "object" || Array.isArray(solution)) {
 		return "The solution must be a JSON object.";
@@ -29,16 +31,15 @@ export function validateBasicSolutionStructure(solution) {
 		if (node.actions != null && !Array.isArray(node.actions)) {
 			return `Node "${nodeId}" actions must be an array.`;
 		}
-		const actions = Array.isArray(node.actions) ? node.actions : [];
+		const actions = getNodeActions(node);
 		if (node.terminal === true && actions.length > 0) {
 			return `Terminal node "${nodeId}" cannot contain actions.`;
 		}
 
 		for (let actionIndex = 0; actionIndex < actions.length; actionIndex += 1) {
 			const action = actions[actionIndex];
-			if (typeof action === "string") continue;
 			if (!action || typeof action !== "object" || Array.isArray(action)) {
-				return `Action ${actionIndex + 1} on node "${nodeId}" must be an object or string.`;
+				return `Action ${actionIndex + 1} on node "${nodeId}" must be an object.`;
 			}
 			if (typeof action.label !== "string" && typeof action.id !== "string") {
 				return `Action ${actionIndex + 1} on node "${nodeId}" needs an id or label.`;
