@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { RANKS } from "../utils/parseRange";
 import { actionColor } from "../utils/actions";
-import { checkHand, checkHandAgainstRange } from "../utils/checkRange";
+import { checkRangeConsistency } from "../utils/checkRange";
 
 const EMPTY_ACTIONS = {};
 const EMPTY_FREQ = {};
@@ -32,7 +32,6 @@ const Cell = memo(function Cell({
 	actions = EMPTY_ACTIONS,
 	comboFreq = EMPTY_FREQ,
 	referenceComboFreq,
-	referenceAction,
 	isSelected = false,
 	onHover,
 	onSelect,
@@ -45,9 +44,12 @@ const Cell = memo(function Cell({
 		.sort(([a], [b]) => actionPriority(a) - actionPriority(b));
 
 	// Compare against the prior action range when one is available.
-	const { total, expected, status } = referenceComboFreq
-		? checkHandAgainstRange(hand, comboFreq, referenceComboFreq, referenceAction)
-		: checkHand(actions);
+	const { total, expected, status } = checkRangeConsistency({
+		hand,
+		freq: actions,
+		comboFreq,
+		referenceComboFreq,
+	});
 
 	const tip = (entries.length > 0
 		? `${hand} · ` + entries.map(([act, f]) => `${act}: ${Math.round(f * 100)}%`).join(", ")
@@ -93,7 +95,6 @@ export default function RangeGrid({
 	onSelectHand,
 	comboFreq = EMPTY_FREQ,
 	referenceComboFreq,
-	referenceAction,
 	className = "",
 }) {
 	const cells = HANDS.map((hand) => (
@@ -103,7 +104,6 @@ export default function RangeGrid({
 			actions={freq[hand] || EMPTY_ACTIONS}
 			comboFreq={comboFreq}
 			referenceComboFreq={referenceComboFreq}
-			referenceAction={referenceAction}
 			isSelected={selectedHand === hand}
 			onHover={onHoverHand}
 			onSelect={onSelectHand}

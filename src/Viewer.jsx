@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { FlaggedContext, checkSpot, findFlaggedSpots } from "./utils/checkRange";
+import { FlaggedContext, checkRangeConsistency, findFlaggedSpots } from "./utils/checkRange";
 
 import Section from "./components/Section";
 import SpotSection from "./components/SpotSection";
@@ -94,7 +94,7 @@ export default function Viewer({ initialRanges, fileName }) {
 
 	const rawVal = selected ? getNestedValue(rangesData, selected) : "";
 	const freq = parseRange(rawVal);
-	const { over, under } = checkSpot(freq);
+	const { over, under } = checkRangeConsistency({ freq });
 	const flagged = useMemo(() => findFlaggedSpots(rangesData), [rangesData]);
 	const pick = { selected, onSelect: setSelected };
 

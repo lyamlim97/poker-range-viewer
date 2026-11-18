@@ -1,4 +1,5 @@
 import { getOrderedActions } from "./actionHelpers";
+import { getPositionRangeReference } from "./checkRange";
 
 export const POSITIONS_6MAX = [
 	{ id: "EP", defaultStack: 100 },
@@ -276,21 +277,13 @@ export function isActionPathValid(actionHistory, solutionData) {
 }
 
 function getPreviousActionReference(solutionData, actionHistory, position) {
-	let reference = null;
-	resolveTreeNode(solutionData, actionHistory, (node, event, action) => {
-		if (event.position === position && action) {
-			const label = getActionLabel(action);
-			if (typeof label !== "string") return;
-			const rangeText = getActionRange(action, node);
-			if (typeof rangeText === "string") {
-				reference = {
-					strategy: getSolutionNodeStrategy(node),
-					action: label,
-				};
-			}
-		}
+	const previous = getPositionRangeReference(solutionData, {
+		actionHistory,
+		position,
 	});
-	return reference;
+	return previous
+		? { range: previous.range, action: previous.action }
+		: null;
 }
 
 function resolveSpot(solutionData, position, actionHistory) {
@@ -517,8 +510,7 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 		title: node?.title || spot?.title || defaultTitle,
 		terminal: node?.terminal === true,
 		tags: Array.isArray(node?.tags) ? node.tags : [],
-		referenceStrategy: previousActionReference?.strategy || null,
-		referenceAction: previousActionReference?.action || null,
+		referenceRange: previousActionReference?.range || null,
 		actions: limitActionsToStack(actions, position, actionHistory),
 		strategy: strategyUnavailable
 			? EMPTY_STRATEGY

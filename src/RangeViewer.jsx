@@ -280,9 +280,9 @@ export default function RangeViewer({
 	);
 	const referenceComboFreq = useMemo(
 		() => {
-			const referenceStrategy = scenario?.referenceStrategy;
-			return referenceStrategy
-				? parseSolutionStrategy(currentRangesData, referenceStrategy).comboFreq
+			const referenceRange = scenario?.referenceRange;
+			return referenceRange
+				? parseSolutionStrategy(currentRangesData, referenceRange).comboFreq
 				: null;
 		},
 		[currentRangesData, scenario]
@@ -410,7 +410,6 @@ export default function RangeViewer({
 								onSelectHand={setSelectedHand}
 								comboFreq={comboFreq}
 								referenceComboFreq={referenceComboFreq}
-								referenceAction={scenario?.referenceAction}
 								className="rv-range-grid"
 							/>
 						</div>

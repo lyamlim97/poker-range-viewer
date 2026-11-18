@@ -2015,6 +2015,32 @@ button.flagged::after {
 	background: rgba(0, 0, 0, 0.18);
 }
 
+.range-editor-card > .rv-action-summary {
+	margin-bottom: 12px;
+}
+
+.range-editor-range-check {
+	margin-bottom: 12px;
+	padding: 8px 10px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: rgba(0, 0, 0, 0.12);
+	color: var(--muted);
+	font-size: 11px;
+}
+
+.range-editor-range-check.ok {
+	border-color: rgba(52, 211, 153, 0.28);
+	background: rgba(52, 211, 153, 0.08);
+	color: #34d399;
+}
+
+.range-editor-range-check.warning {
+	border-color: rgba(251, 191, 36, 0.28);
+	background: rgba(251, 191, 36, 0.08);
+	color: #fbbf24;
+}
+
 .range-editor-action-list {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

@@ -1,3 +1,7 @@
+import {
+	checkNodeRangeConsistency,
+} from "./checkRange";
+
 const POSITION_IDS = new Set(["EP", "MP", "CO", "BU", "SB", "BB"]);
 const POSITION_ORDER = ["EP", "MP", "CO", "BU", "SB", "BB"];
 
@@ -155,6 +159,7 @@ function getMappedTarget(node, action) {
 	return null;
 }
 
+
 function getTargetLabel(target) {
 	if (typeof target === "string") return target.trim() ? target : "(empty target)";
 	if (target && typeof target.nodeId === "string" && target.nodeId.trim()) {
@@ -293,6 +298,7 @@ export function validateSolutionTree(solutionData = {}) {
 	const invalidEndpointNodeIds = new Set();
 	const outcomeActionsWithLinks = new Set();
 	const misplacedRareNodeTags = new Set();
+	const rangeIssues = [];
 
 	function addTarget(sourceNodeId, target) {
 		if (typeof target !== "string" || !target.trim()) {
@@ -470,6 +476,60 @@ export function validateSolutionTree(solutionData = {}) {
 			}
 		}
 
+		if (!isEndpoint && actions.length > 0) {
+			const rangeCheck = checkNodeRangeConsistency(solutionData, nodeId);
+			if (rangeCheck?.kind === "100") {
+				for (const issue of [
+					...rangeCheck.over.map((item) => ({ ...item, status: "over" })),
+					...rangeCheck.under.map((item) => ({ ...item, status: "under" })),
+				]) {
+					const category =
+						issue.status === "over"
+							? "range-over-100"
+							: "range-under-100";
+					rangeIssues.push({
+						category,
+						nodeId,
+						hand: issue.hand,
+						total: issue.total,
+					});
+					addIssue(category, "warning", nodeId, {
+						message: `Hand "${issue.hand}" action frequencies add up to ${+(issue.total * 100).toFixed(1)}%, not 100%.`,
+						hand: issue.hand,
+						total: issue.total,
+					});
+				}
+			} else if (rangeCheck?.kind === "previous") {
+				for (const issue of [
+					...rangeCheck.over.map((item) => ({ ...item, status: "over" })),
+					...rangeCheck.under.map((item) => ({ ...item, status: "under" })),
+					...rangeCheck.mismatch.map((item) => ({ ...item, status: "mismatch" })),
+				]) {
+					const category =
+						issue.status === "over"
+							? "range-over-previous"
+							: issue.status === "under"
+								? "range-under-previous"
+								: "range-mismatch-previous";
+					rangeIssues.push({
+						category,
+						nodeId,
+						hand: issue.hand,
+						total: issue.total,
+						expected: issue.expected,
+						previousAction: rangeCheck.previous.action,
+					});
+					addIssue(category, "warning", nodeId, {
+						message: `Hand "${issue.hand}" totals ${+(issue.total * 100).toFixed(1)}%; ${rangeCheck.previous.action} previously allowed ${+(issue.expected * 100).toFixed(1)}%.`,
+						hand: issue.hand,
+						total: issue.total,
+						expected: issue.expected,
+						previousAction: rangeCheck.previous.action,
+					});
+				}
+			}
+		}
+
 		if (isEndpoint && outgoingReferenceNodeIds.has(nodeId)) {
 			invalidEndpointNodeIds.add(nodeId);
 			addIssue("endpoint-with-outgoing-link", "error", nodeId, {
@@ -551,6 +611,7 @@ export function validateSolutionTree(solutionData = {}) {
 	return {
 		missingTargets,
 		actionsWithoutRange,
+		rangeIssues,
 		wronglyLinkedNodes,
 		actionsWithoutNextNode: [...actionsWithoutNextNode].map(([nodeId]) => nodeId),
 		actionsWithoutNextNodeCount,

@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import DagCanvas from "./components/DagCanvas";
-import { parseDetailedRange } from "./utils/parseRange";
+import ActionSummary from "./components/ActionSummary";
+import {
+	parseDetailedRange,
+} from "./utils/parseRange";
+import {
+	checkNodeRangeConsistency,
+} from "./utils/checkRange";
 import {
 	getActionKey,
 	getActionLabel,
@@ -92,6 +98,9 @@ function buildValidationGroups(report) {
 	return [
 		["Missing targets", report.missingTargets.map((item) => `${item.sourceNodeId} → ${item.targetNodeId}`)],
 		["Action ranges needed", report.actionsWithoutRange],
+		["Range consistency", (report.rangeIssues || []).map((issue) =>
+			`${issue.nodeId || "Solution"}${issue.hand ? ` — ${issue.hand}` : ""}`
+		)],
 		["Actions without a next node", report.actionsWithoutNextNode],
 		["Wrongly linked actions", report.wronglyLinkedNodes.map((item) => `${item.sourceNodeId} → ${item.targetNodeId}`)],
 		["Unreachable nodes", report.unreachableNodeIds],
@@ -148,9 +157,13 @@ export default function DagEditor({
 	);
 	const isDirty = Boolean(solution && revision > savedRevision);
 	const selectedNode = solution?.nodes?.[selectedNodeId] || null;
-	const selectedActions = Array.isArray(selectedNode?.actions)
-		? selectedNode.actions
-		: [];
+	const selectedActions = useMemo(
+		() =>
+			Array.isArray(selectedNode?.actions)
+				? selectedNode.actions
+				: [],
+		[selectedNode]
+	);
 	const selectedActionIndex = selectedActions.findIndex(
 		(action, index) => getActionKey(action, index) === selectedActionKey
 	);
@@ -163,6 +176,11 @@ export default function DagEditor({
 		() => (selectedRange?.trim() ? parseDetailedRange(selectedRange) : null),
 		[selectedRange]
 	);
+	const nodeRangeCheck = useMemo(() => {
+		return solution
+			? checkNodeRangeConsistency(solution, selectedNodeId)
+			: null;
+	}, [solution, selectedNodeId]);
 	const selectedActionOutcome =
 		selectedAction && typeof selectedAction === "object"
 			? selectedAction.terminal
@@ -1041,6 +1059,42 @@ export default function DagEditor({
 										</button>
 									</div>
 									<code className="range-editor-node-path">{selectedNodeId}</code>
+									{selectedNode.terminal !== true && selectedActions.length > 0 && (
+										<>
+											{nodeRangeCheck && (
+												<div
+													className={`range-editor-range-check ${
+														nodeRangeCheck.kind === "unavailable"
+															? "warning"
+															: nodeRangeCheck.over?.length ||
+															  nodeRangeCheck.under?.length ||
+															  nodeRangeCheck.mismatch?.length
+																? "warning"
+																: "ok"
+													}`}
+												>
+													{nodeRangeCheck.kind === "100" &&
+														(nodeRangeCheck.empty
+															? "No hands entered for this node"
+															: nodeRangeCheck.over.length === 0 &&
+															  nodeRangeCheck.under.length === 0
+																? "✓ Every hand adds up to 100%"
+																: `${nodeRangeCheck.over.length} over 100% · ${nodeRangeCheck.under.length} under 100%`)}
+													{nodeRangeCheck.kind === "previous" &&
+														(nodeRangeCheck.over.length === 0 &&
+														nodeRangeCheck.under.length === 0 &&
+														nodeRangeCheck.mismatch.length === 0
+															? `✓ Every hand matches ${nodeRangeCheck.previous.action}`
+															: `${nodeRangeCheck.over.length} over · ${nodeRangeCheck.under.length} under · ${nodeRangeCheck.mismatch.length} mismatched`)}
+													{nodeRangeCheck.kind === "unavailable" &&
+														(nodeRangeCheck.reason || "Previous range unavailable")}
+												</div>
+											)}
+											<ActionSummary
+												freq={nodeRangeCheck?.rangeData?.freq || {}}
+											/>
+										</>
+									)}
 									{selectedNodeIssues.length > 0 && (
 										<div className="range-editor-node-issues" role="status">
 											<strong>
