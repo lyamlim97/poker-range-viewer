@@ -14,16 +14,35 @@ import {
 	getOrderedActions,
 	getRangeClass,
 	getRangeStatus,
-} from "./utils/actionHelpers";
-import { actionColor } from "./utils/actions";
+	actionColor,
+} from "./utils/actions";
+import {
+	RARE_TAG,
+	getActionOutcome,
+	getActionTarget,
+	getNodeActions,
+	getRootNodeId,
+	getSolutionNodes,
+	isRareAction,
+	isTerminalAction,
+} from "./utils/solutionAccessors";
+import { getNodeIdPosition } from "./utils/nodeId";
 import {
 	getExpectedNextNodeId,
 	validateSolutionTree,
 } from "./utils/validateSolutionTree";
+import {
+	EMPTY_SOLUTION_INDEX,
+	EMPTY_SOLUTION_URLS,
+	fetchJson,
+	getSolutionAssetUrl,
+} from "./utils/solutionLoader";
+import { normalizeSolution } from "./utils/normalizeSolution";
+import { editorLoadUrl, editorSaveUrl } from "./utils/editorApi";
+import { downloadJson } from "./utils/download";
+import { describeRangeCheck, getValidationGroups } from "./utils/reports";
+import { TrashIcon } from "./components/icons";
 import "./App.css";
-
-const EMPTY_SOLUTIONS = [];
-const EMPTY_URLS = {};
 
 const ACTION_TYPES = [
 	{ id: "fold", label: "Fold", hasSize: false },
@@ -45,11 +64,7 @@ function makeSlug(value) {
 
 function makeUniqueActionId(label, actions) {
 	const base = makeSlug(label);
-	const usedIds = new Set(
-		actions.map((action) =>
-			typeof action === "object" && action?.id ? action.id : null
-		)
-	);
+	const usedIds = new Set(actions.map((action) => action?.id));
 	let id = base;
 	let suffix = 2;
 	while (usedIds.has(id)) {
@@ -75,14 +90,6 @@ function makeActionLabel(kind, size) {
 	return `${type.label} ${sizeText}`;
 }
 
-function normalizeAction(action, index, actions) {
-	if (typeof action !== "string") return action;
-	return {
-		id: makeUniqueActionId(action, actions.slice(0, index)),
-		label: action,
-	};
-}
-
 function updateNode(solution, nodeId, update) {
 	const node = solution.nodes[nodeId];
 	return {
@@ -94,29 +101,33 @@ function updateNode(solution, nodeId, update) {
 	};
 }
 
-function buildValidationGroups(report) {
-	return [
-		["Missing targets", report.missingTargets.map((item) => `${item.sourceNodeId} → ${item.targetNodeId}`)],
-		["Action ranges needed", report.actionsWithoutRange],
-		["Range consistency", (report.rangeIssues || []).map((issue) =>
-			`${issue.nodeId || "Solution"}${issue.hand ? ` — ${issue.hand}` : ""}`
-		)],
-		["Actions without a next node", report.actionsWithoutNextNode],
-		["Wrongly linked actions", report.wronglyLinkedNodes.map((item) => `${item.sourceNodeId} → ${item.targetNodeId}`)],
-		["Unreachable nodes", report.unreachableNodeIds],
-		["Incomplete nodes", report.incompleteNodeIds],
-		["Position mismatches", report.positionMismatches.map((item) => item.nodeId)],
-		["Cycles", report.cycles.map((cycle) => cycle.join(" → "))],
-		["Outcome actions with links", report.outcomeActionsWithLinks],
-		["Misplaced rare node tags", report.misplacedRareNodeTags],
-		["Terminal node endpoint issues", report.invalidEndpointNodeIds],
-		["Other tree issues", report.invalidNodeIds],
-	].filter(([, values]) => values.length > 0);
+function withPlaceholderNode(solution, nodeId) {
+	if (Object.hasOwn(solution.nodes, nodeId)) return solution;
+	return {
+		...solution,
+		nodes: {
+			...solution.nodes,
+			[nodeId]: { nodeId, position: getNodeIdPosition(nodeId), actions: [] },
+		},
+	};
 }
 
+function withoutStrategyLabel(node, label) {
+	if (!node.strategy || typeof node.strategy !== "object") return node;
+	const strategy = { ...node.strategy };
+	delete strategy[label];
+	const nextNode = { ...node };
+	if (Object.keys(strategy).length > 0) nextNode.strategy = strategy;
+	else delete nextNode.strategy;
+	return nextNode;
+}
+
+const expectedTargetOf = (nodeId, action) =>
+	getExpectedNextNodeId(nodeId, action)?.nodeId || "";
+
 export default function DagEditor({
-	solutionIndex = EMPTY_SOLUTIONS,
-	solutionUrls = EMPTY_URLS,
+	solutionIndex = EMPTY_SOLUTION_INDEX,
+	solutionUrls = EMPTY_SOLUTION_URLS,
 }) {
 	const [selectedSolutionId, setSelectedSolutionId] = useState(
 		() => solutionIndex[0]?.id || ""
@@ -157,13 +168,7 @@ export default function DagEditor({
 	);
 	const isDirty = Boolean(solution && revision > savedRevision);
 	const selectedNode = solution?.nodes?.[selectedNodeId] || null;
-	const selectedActions = useMemo(
-		() =>
-			Array.isArray(selectedNode?.actions)
-				? selectedNode.actions
-				: [],
-		[selectedNode]
-	);
+	const selectedActions = useMemo(() => getNodeActions(selectedNode), [selectedNode]);
 	const selectedActionIndex = selectedActions.findIndex(
 		(action, index) => getActionKey(action, index) === selectedActionKey
 	);
@@ -181,25 +186,11 @@ export default function DagEditor({
 			? checkNodeRangeConsistency(solution, selectedNodeId)
 			: null;
 	}, [solution, selectedNodeId]);
-	const selectedActionOutcome =
-		selectedAction && typeof selectedAction === "object"
-			? selectedAction.terminal
-				? "terminal"
-				: Array.isArray(selectedAction.tags) &&
-				  selectedAction.tags.includes("almost-never-reached")
-					? "rare"
-					: "continue"
-			: "continue";
-	const selectedActionTarget =
-		selectedAction &&
-		typeof selectedAction === "object" &&
-		typeof selectedAction.nextNodeId === "string"
-			? selectedAction.nextNodeId
-			: "";
-	const expectedSelectedActionTarget =
-		selectedAction
-			? getExpectedNextNodeId(selectedNodeId, selectedAction)?.nodeId || ""
-			: "";
+	const selectedActionOutcome = getActionOutcome(selectedAction);
+	const selectedActionTarget = getActionTarget(selectedAction);
+	const expectedSelectedActionTarget = selectedAction
+		? expectedTargetOf(selectedNodeId, selectedAction)
+		: "";
 	const continuationTargetOptions = useMemo(() => {
 		if (!solution) return [];
 		return [
@@ -222,9 +213,7 @@ export default function DagEditor({
 	const selectedNodeIssues =
 		validationReport?.nodeIssues?.[selectedNodeId] || [];
 	const validationGroups = validationReport
-		? [
-				...buildValidationGroups(validationReport),
-			]
+		? getValidationGroups(validationReport, { compact: true })
 		: [];
 	const otherTreeIssueCount = validationReport
 		? validationReport.issueCount - validationReport.actionsWithoutRange.length
@@ -238,7 +227,7 @@ export default function DagEditor({
 	const previewAction = actionLabel ? { label: actionLabel } : null;
 	const nextNodePreview =
 		selectedNode && previewAction
-			? getExpectedNextNodeId(selectedNodeId, previewAction)?.nodeId || null
+			? expectedTargetOf(selectedNodeId, previewAction) || null
 			: null;
 	const selectedActionType = ACTION_TYPES.find(
 		(item) => item.id === newActionKind
@@ -264,8 +253,7 @@ export default function DagEditor({
 
 		let cancelled = false;
 		const controller = new AbortController();
-		const assetUrl =
-			solutionUrls[`./data/solutions/${selectedSolutionId}.json`];
+		const assetUrl = getSolutionAssetUrl(solutionUrls, selectedSolutionId);
 
 		async function loadSolution() {
 			try {
@@ -275,32 +263,13 @@ export default function DagEditor({
 					);
 				}
 
-				const response = await fetch(
-					canWriteFiles
-						? `/__range-editor/load/${encodeURIComponent(selectedSolutionId)}`
-						: assetUrl,
-					{
-						cache: "no-cache",
-						signal: controller.signal,
-					}
+				const body = await fetchJson(
+					canWriteFiles ? editorLoadUrl(selectedSolutionId) : assetUrl,
+					{ signal: controller.signal }
 				);
-				if (!response.ok) {
-					throw new Error(
-						`The solution file could not be loaded (HTTP ${response.status}).`
-					);
-				}
-
-				const responseData = await response.json();
-				const data = canWriteFiles
-					? responseData.solution
-					: responseData;
-				if (
-					!data ||
-					typeof data !== "object" ||
-					!data.nodes ||
-					typeof data.nodes !== "object" ||
-					Array.isArray(data.nodes)
-				) {
+				const data = normalizeSolution(canWriteFiles ? body?.solution : body);
+				const dataNodes = getSolutionNodes(data);
+				if (!dataNodes) {
 					throw new Error("The solution must contain a nodes object.");
 				}
 				if (cancelled) return;
@@ -311,13 +280,13 @@ export default function DagEditor({
 					status: "ready",
 					data,
 					error: null,
-					diskRevision: canWriteFiles ? responseData.revision : null,
+					diskRevision: canWriteFiles ? body.revision : null,
 				});
+				const rootNodeId = getRootNodeId(data);
 				setSelectedNodeId(
-					typeof data.rootNodeId === "string" &&
-						Object.hasOwn(data.nodes, data.rootNodeId)
-						? data.rootNodeId
-						: Object.keys(data.nodes)[0] || ""
+					rootNodeId && Object.hasOwn(dataNodes, rootNodeId)
+						? rootNodeId
+						: Object.keys(dataNodes)[0] || ""
 				);
 				setSelectedActionKey("");
 				setRevision(0);
@@ -364,17 +333,14 @@ export default function DagEditor({
 			const savePromise = saveQueueRef.current
 				.catch(() => {})
 				.then(async () => {
-					const response = await fetch(
-						`/__range-editor/save/${encodeURIComponent(solutionId)}`,
-						{
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({
-								solution: snapshot,
-								expectedRevision: diskRevision,
-							}),
-						}
-					);
+					const response = await fetch(editorSaveUrl(solutionId), {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							solution: snapshot,
+							expectedRevision: diskRevision,
+						}),
+					});
 					const result = await response.json().catch(() => null);
 					if (!response.ok) {
 						const error = new Error(
@@ -457,14 +423,9 @@ export default function DagEditor({
 		if (selectedActionIndex < 0) return;
 		updateSolution((current) =>
 			updateNode(current, selectedNodeId, (node) => {
-				const actions = [...(Array.isArray(node.actions) ? node.actions : [])];
-				const currentAction = normalizeAction(
-					actions[selectedActionIndex],
-					selectedActionIndex,
-					actions
-				);
+				const actions = [...getNodeActions(node)];
 				actions[selectedActionIndex] = {
-					...currentAction,
+					...actions[selectedActionIndex],
 					rawRangeText: value,
 				};
 				return { ...node, actions };
@@ -485,42 +446,19 @@ export default function DagEditor({
 
 		updateSolution((current) =>
 			updateNode(current, selectedNodeId, (node) => {
-				const actions = [...(Array.isArray(node.actions) ? node.actions : [])];
-				const currentAction = actions[selectedActionIndex];
-				const updatedAction =
-					typeof currentAction === "object" && currentAction
-						? { ...currentAction }
-						: currentAction;
-				if (typeof updatedAction === "object" && updatedAction) {
-					delete updatedAction.rawRangeText;
-				}
+				const actions = [...getNodeActions(node)];
+				const updatedAction = { ...actions[selectedActionIndex] };
+				delete updatedAction.rawRangeText;
 				actions[selectedActionIndex] = updatedAction;
-
-				const nextNode = { ...node, actions };
-				if (node.strategy && typeof node.strategy === "object") {
-					const strategy = { ...node.strategy };
-					delete strategy[label];
-					if (Object.keys(strategy).length > 0) {
-						nextNode.strategy = strategy;
-					} else {
-						delete nextNode.strategy;
-					}
-				}
-				return nextNode;
+				return withoutStrategyLabel({ ...node, actions }, label);
 			})
 		);
 	}
 
 	function updateSelectedActionOutcome(outcome, targetNodeId = "") {
 		if (selectedActionIndex < 0) return;
-		const expected =
-			getExpectedNextNodeId(selectedNodeId, selectedAction)?.nodeId || "";
-		const existingTarget =
-			selectedAction &&
-			typeof selectedAction === "object" &&
-			typeof selectedAction.nextNodeId === "string"
-				? selectedAction.nextNodeId
-				: "";
+		const expected = expectedTargetOf(selectedNodeId, selectedAction);
+		const existingTarget = getActionTarget(selectedAction);
 		const selectedTarget =
 			targetNodeId ||
 			(existingTarget && Object.hasOwn(solution.nodes, existingTarget)
@@ -528,17 +466,11 @@ export default function DagEditor({
 				: expected);
 
 		updateSolution((current) => {
-			let next = updateNode(current, selectedNodeId, (node) => {
-				const actions = [...(Array.isArray(node.actions) ? node.actions : [])];
-				const currentAction = normalizeAction(
-					actions[selectedActionIndex],
-					selectedActionIndex,
-					actions
-				);
+			const next = updateNode(current, selectedNodeId, (node) => {
+				const actions = [...getNodeActions(node)];
+				const currentAction = actions[selectedActionIndex];
 				const tags = Array.isArray(currentAction.tags)
-					? currentAction.tags.filter(
-							(tag) => tag !== "almost-never-reached"
-						)
+					? currentAction.tags.filter((tag) => tag !== RARE_TAG)
 					: [];
 				const updatedAction = { ...currentAction };
 
@@ -550,10 +482,7 @@ export default function DagEditor({
 				if (outcome === "terminal") {
 					updatedAction.terminal = true;
 				} else if (outcome === "rare") {
-					updatedAction.tags = [
-						...tags,
-						"almost-never-reached",
-					];
+					updatedAction.tags = [...tags, RARE_TAG];
 				} else if (outcome === "continue" && selectedTarget) {
 					updatedAction.nextNodeId = selectedTarget;
 				}
@@ -562,30 +491,11 @@ export default function DagEditor({
 				return { ...node, actions };
 			});
 
-			if (outcome === "continue" && selectedTarget) {
-				if (Object.hasOwn(next.nodes, selectedTarget)) return next;
-				const position = selectedTarget.split("_").pop();
-				return {
-					...next,
-					nodes: {
-						...next.nodes,
-						[selectedTarget]: {
-							nodeId: selectedTarget,
-							position,
-							actions: [],
-						},
-					},
-				};
-			}
-			return next;
+			return outcome === "continue" && selectedTarget
+				? withPlaceholderNode(next, selectedTarget)
+				: next;
 		});
-		setSelectedActionKey(
-			normalizeAction(
-				selectedAction,
-				selectedActionIndex,
-				selectedActions
-			)?.id || getActionKey(selectedAction, selectedActionIndex)
-		);
+		setSelectedActionKey(getActionKey(selectedAction, selectedActionIndex));
 		setAddActionError("");
 	}
 
@@ -624,37 +534,18 @@ export default function DagEditor({
 		} else if (effectiveOutcome === "terminal") {
 			action.terminal = true;
 		} else {
-			action.tags = ["almost-never-reached"];
+			action.tags = [RARE_TAG];
 		}
 
 		updateSolution((current) => {
 			const currentNode = current.nodes[selectedNodeId];
-			const actions = [
-				...(Array.isArray(currentNode.actions) ? currentNode.actions : []),
-				action,
-			];
-			let next = updateNode(current, selectedNodeId, (node) => ({
+			const next = updateNode(current, selectedNodeId, (node) => ({
 				...node,
-				actions,
+				actions: [...getNodeActions(currentNode), action],
 			}));
-
-			if (
-				effectiveOutcome === "continue" &&
-				!Object.hasOwn(next.nodes, nextNodePreview)
-			) {
-				next = {
-					...next,
-					nodes: {
-						...next.nodes,
-						[nextNodePreview]: {
-							nodeId: nextNodePreview,
-							position: nextNodePreview.split("_").pop(),
-							actions: [],
-						},
-					},
-				};
-			}
-			return next;
+			return effectiveOutcome === "continue"
+				? withPlaceholderNode(next, nextNodePreview)
+				: next;
 		});
 		setSelectedActionKey(action.id);
 		setNewActionKind("raise");
@@ -667,7 +558,7 @@ export default function DagEditor({
 			updateNode(current, selectedNodeId, (node) => ({
 				...node,
 				terminal: false,
-				actions: Array.isArray(node.actions) ? node.actions : [],
+				actions: getNodeActions(node),
 			}))
 		);
 	}
@@ -694,10 +585,7 @@ export default function DagEditor({
 				const node = { ...originalNode };
 				if (!Array.isArray(node.actions)) continue;
 				node.actions = node.actions.map((action) => {
-					if (
-						typeof action === "object" &&
-						action.nextNodeId === nodeId
-					) {
+					if (action.nextNodeId === nodeId) {
 						const updated = { ...action };
 						delete updated.nextNodeId;
 						updated.terminal = true;
@@ -722,7 +610,7 @@ export default function DagEditor({
 	function deleteAction(nodeId, actionKey) {
 		if (!nodeId || !actionKey) return;
 		const node = solution?.nodes?.[nodeId];
-		const actions = Array.isArray(node?.actions) ? node.actions : [];
+		const actions = getNodeActions(node);
 		const actionIndex = actions.findIndex(
 			(action, index) => getActionKey(action, index) === actionKey
 		);
@@ -739,28 +627,16 @@ export default function DagEditor({
 
 		updateSolution((current) =>
 			updateNode(current, nodeId, (currentNode) => {
-				const currentActions = Array.isArray(currentNode.actions)
-					? [...currentNode.actions]
-					: [];
+				const currentActions = [...getNodeActions(currentNode)];
 				const currentIndex = currentActions.findIndex(
 					(item, index) => getActionKey(item, index) === actionKey
 				);
 				if (currentIndex < 0) return currentNode;
-				const removedAction = currentActions[currentIndex];
-				const removedLabel = getActionLabel(removedAction);
-				currentActions.splice(currentIndex, 1);
-
-				const nextNode = { ...currentNode, actions: currentActions };
-				if (currentNode.strategy && typeof currentNode.strategy === "object") {
-					const strategy = { ...currentNode.strategy };
-					delete strategy[removedLabel];
-					if (Object.keys(strategy).length > 0) {
-						nextNode.strategy = strategy;
-					} else {
-						delete nextNode.strategy;
-					}
-				}
-				return nextNode;
+				const [removedAction] = currentActions.splice(currentIndex, 1);
+				return withoutStrategyLabel(
+					{ ...currentNode, actions: currentActions },
+					getActionLabel(removedAction)
+				);
 			})
 		);
 
@@ -816,18 +692,7 @@ export default function DagEditor({
 
 	function downloadLocalBackup() {
 		if (!solution) return;
-		const blob = new Blob(
-			[`${JSON.stringify(solution, null, "\t")}\n`],
-			{ type: "application/json" }
-		);
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement("a");
-		link.href = url;
-		link.download = `${selectedSolutionId}-local-backup.json`;
-		document.body.appendChild(link);
-		link.click();
-		link.remove();
-		URL.revokeObjectURL(url);
+		downloadJson(solution, `${selectedSolutionId}-local-backup.json`);
 	}
 
 	function selectNode(id) {
@@ -995,12 +860,8 @@ export default function DagEditor({
 							selectNode(nodeId);
 							setAddFocusTick((current) => current + 1);
 						}}
-						onDeleteNode={(nodeId) => {
-							deleteNode(nodeId);
-						}}
-						onDeleteAction={(nodeId, actionKey) => {
-							deleteAction(nodeId, actionKey);
-						}}
+						onDeleteNode={deleteNode}
+						onDeleteAction={deleteAction}
 					/>
 
 					<main className="range-editor-main">
@@ -1014,7 +875,7 @@ export default function DagEditor({
 													? "Root decision"
 													: "Decision node"}
 											</div>
-											<h2>{selectedNode.position || selectedNodeId.split("_").pop()}</h2>
+											<h2>{selectedNode.position || getNodeIdPosition(selectedNodeId)}</h2>
 										</div>
 										{selectedNode.terminal === true ? (
 											<button
@@ -1045,51 +906,23 @@ export default function DagEditor({
 													: "Delete this node"
 											}
 										>
-											<svg
-												className="range-editor-button-icon"
-												viewBox="0 0 24 24"
-												aria-hidden="true"
-											>
-												<path d="M3 6h18" />
-												<path d="M8 6V4h8v2" />
-												<path d="M19 6l-1 14H6L5 6" />
-												<path d="M10 10v6M14 10v6" />
-											</svg>
+											<TrashIcon />
 											<span>Delete node</span>
 										</button>
 									</div>
 									<code className="range-editor-node-path">{selectedNodeId}</code>
 									{selectedNode.terminal !== true && selectedActions.length > 0 && (
 										<>
-											{nodeRangeCheck && (
-												<div
-													className={`range-editor-range-check ${
-														nodeRangeCheck.kind === "unavailable"
-															? "warning"
-															: nodeRangeCheck.over?.length ||
-															  nodeRangeCheck.under?.length ||
-															  nodeRangeCheck.mismatch?.length
-																? "warning"
-																: "ok"
-													}`}
-												>
-													{nodeRangeCheck.kind === "100" &&
-														(nodeRangeCheck.empty
-															? "No hands entered for this node"
-															: nodeRangeCheck.over.length === 0 &&
-															  nodeRangeCheck.under.length === 0
-																? "✓ Every hand adds up to 100%"
-																: `${nodeRangeCheck.over.length} over 100% · ${nodeRangeCheck.under.length} under 100%`)}
-													{nodeRangeCheck.kind === "previous" &&
-														(nodeRangeCheck.over.length === 0 &&
-														nodeRangeCheck.under.length === 0 &&
-														nodeRangeCheck.mismatch.length === 0
-															? `✓ Every hand matches ${nodeRangeCheck.previous.action}`
-															: `${nodeRangeCheck.over.length} over · ${nodeRangeCheck.under.length} under · ${nodeRangeCheck.mismatch.length} mismatched`)}
-													{nodeRangeCheck.kind === "unavailable" &&
-														(nodeRangeCheck.reason || "Previous range unavailable")}
-												</div>
-											)}
+											{nodeRangeCheck && (() => {
+												const { tone, text } = describeRangeCheck(nodeRangeCheck);
+												return (
+													<div
+														className={`range-editor-range-check ${tone === "warning" ? "warning" : "ok"}`}
+													>
+														{text}
+													</div>
+												);
+											})()}
 											<ActionSummary
 												freq={nodeRangeCheck?.rangeData?.freq || {}}
 											/>
@@ -1119,25 +952,10 @@ export default function DagEditor({
 										<div className="range-editor-action-list">
 											{getOrderedActions(selectedActions).map(({ action, key }) => {
 												const label = getActionLabel(action);
-												const target =
-													typeof action === "object"
-														? action.nextNodeId
-														: null;
-												const isTerminalAction =
-													action &&
-													typeof action === "object" &&
-													action.terminal === true;
-												const isRareAction =
-													action &&
-													typeof action === "object" &&
-													Array.isArray(action.tags) &&
-													action.tags.includes("almost-never-reached");
-												const missingNextNode =
-													action &&
-													typeof action === "object" &&
-													!isTerminalAction &&
-													!isRareAction &&
-													!(typeof target === "string" && target.trim());
+												const target = getActionTarget(action);
+												const terminal = isTerminalAction(action);
+												const rare = isRareAction(action);
+												const missingNextNode = !terminal && !rare && !target.trim();
 												const selected = key === selectedActionKey;
 												return (
 													<div
@@ -1167,12 +985,12 @@ export default function DagEditor({
 																			⚠ No next node
 																		</span>
 																	)}
-																	{isTerminalAction && (
+																	{terminal && (
 																		<span className="range-editor-action-badge terminal">
 																			Terminal
 																		</span>
 																	)}
-																	{isRareAction && (
+																	{rare && (
 																		<span className="range-editor-action-badge rare">
 																			Almost never reached
 																		</span>
@@ -1185,18 +1003,11 @@ export default function DagEditor({
 																</span>
 															</span>
 															<span className="range-editor-action-bottom">
-																{typeof target === "string" && target
+																{target
 																	? `Next: ${target}`
-																	: action &&
-																	typeof action === "object" &&
-																			action.terminal
+																	: terminal
 																		? "Ends the hand"
-																		: action &&
-																		typeof action === "object" &&
-																				Array.isArray(action.tags) &&
-																				action.tags.includes(
-																					"almost-never-reached"
-																			)
+																		: rare
 																			? "Almost never reached"
 																			: "No next node linked"}
 															</span>
@@ -1209,16 +1020,7 @@ export default function DagEditor({
 															aria-label={`Delete ${label} action`}
 															title={`Delete ${label} action and range`}
 														>
-															<svg
-																className="range-editor-button-icon"
-																viewBox="0 0 24 24"
-																aria-hidden="true"
-															>
-																<path d="M3 6h18" />
-																<path d="M8 6V4h8v2" />
-																<path d="M19 6l-1 14H6L5 6" />
-																<path d="M10 10v6M14 10v6" />
-															</svg>
+															<TrashIcon />
 															<span>Delete</span>
 														</button>
 													</div>
@@ -1263,16 +1065,7 @@ export default function DagEditor({
 													}
 													disabled={!canWriteFiles}
 												>
-													<svg
-														className="range-editor-button-icon"
-														viewBox="0 0 24 24"
-														aria-hidden="true"
-													>
-														<path d="M3 6h18" />
-														<path d="M8 6V4h8v2" />
-														<path d="M19 6l-1 14H6L5 6" />
-														<path d="M10 10v6M14 10v6" />
-													</svg>
+													<TrashIcon />
 													<span>Delete action</span>
 												</button>
 											</div>
@@ -1604,13 +1397,13 @@ export default function DagEditor({
 								</summary>
 								{validationGroups.length > 0 && (
 									<ul>
-										{validationGroups.map(([label, values]) => (
-											<li key={label}>
-												<strong>{label}:</strong> {values.length}
+										{validationGroups.map(({ title, items }) => (
+											<li key={title}>
+												<strong>{title}:</strong> {items.length}
 												<span>
 													{" "}
-													({values.slice(0, 3).join(", ")}
-													{values.length > 3 ? ", …" : ""})
+													({items.slice(0, 3).join(", ")}
+													{items.length > 3 ? ", …" : ""})
 												</span>
 											</li>
 										))}

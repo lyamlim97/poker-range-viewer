@@ -1,69 +1,13 @@
 import { useMemo } from "react";
 import { validateSolutionTree } from "../utils/validateSolutionTree";
+import { getValidationGroups } from "../utils/reports";
 
 export default function TreeValidation({ solutionData }) {
 	const report = useMemo(
 		() => validateSolutionTree(solutionData),
 		[solutionData]
 	);
-	const groups = [
-		{
-			title: `Missing node targets (${report.missingTargets.length})`,
-			items: report.missingTargets.map(
-				({ sourceNodeId, targetNodeId }) => `${sourceNodeId} → ${targetNodeId}`
-			),
-		},
-		{
-			title: `Wrongly linked nodes (${report.wronglyLinkedNodes.length})`,
-			items: report.wronglyLinkedNodes.map(
-				({ sourceNodeId, action, targetNodeId, expectedNodeId }) =>
-					`${sourceNodeId} — ${action} → ${targetNodeId} (expected ${expectedNodeId || "no next node"})`
-			),
-		},
-		{
-			title: `Actions without rawRangeText (${report.actionsWithoutRange.length})`,
-			items: report.actionsWithoutRange,
-		},
-		{
-			title: `Actions without nextNodeId (${report.actionsWithoutNextNodeCount})`,
-			items: report.actionsWithoutNextNode,
-		},
-		{
-			title: `Unreachable nodes (${report.unreachableNodeIds.length})`,
-			items: report.unreachableNodeIds,
-		},
-		{
-			title: `Cycles (${report.cycles.length})`,
-			items: report.cycles.map((cycle) => cycle.join(" → ")),
-		},
-		{
-			title: `Terminal nodes with actions/links (${report.invalidEndpointNodeIds.length})`,
-			items: report.invalidEndpointNodeIds,
-		},
-		{
-			title: `Terminal or almost-never-reached actions with links (${report.outcomeActionsWithLinks.length})`,
-			items: report.outcomeActionsWithLinks,
-		},
-		{
-			title: `Almost-never-reached tags on nodes (move to actions) (${report.misplacedRareNodeTags.length})`,
-			items: report.misplacedRareNodeTags,
-		},
-		{
-			title: `Node ID / position mismatches (${report.positionMismatches.length})`,
-			items: report.positionMismatches.map(
-				({ nodeId, idPosition, declaredPosition }) =>
-					`${nodeId} (ID ends in ${idPosition}; position is ${declaredPosition})`
-			),
-		},
-		{
-			title: `Unfinished decision nodes (${report.incompleteNodeIds.length})`,
-			items: report.incompleteNodeIds,
-		},
-		{
-			title: `Invalid or duplicate node IDs/positions (${report.invalidNodeIds.length})`,
-			items: report.invalidNodeIds,
-		},
-	].filter((group) => group.items.length > 0);
+	const groups = getValidationGroups(report);
 
 	return (
 		<section className="rv-tree-validation" aria-labelledby="rv-tree-validation-title">
@@ -91,7 +35,7 @@ export default function TreeValidation({ solutionData }) {
 				<div className="rv-tree-validation-groups">
 					{groups.map((group) => (
 						<div className="rv-tree-validation-group" key={group.title}>
-							<h3>{group.title}</h3>
+							<h3>{group.title} ({group.count})</h3>
 							<ul className="rv-tree-validation-list">
 								{group.items.map((item, index) => (
 									<li key={`${item}-${index}`}>

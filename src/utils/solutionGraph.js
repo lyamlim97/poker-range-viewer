@@ -1,4 +1,10 @@
-import { getOrderedActions } from "./actionHelpers";
+import { getOrderedActions } from "./actions";
+import {
+	getActionTarget,
+	getNodeActions,
+	getRootNodeId,
+	getSolutionNodes,
+} from "./solutionAccessors";
 
 export const NODE_WIDTH = 210;
 export const HEADER_HEIGHT = 30;
@@ -15,23 +21,12 @@ export function getActionRowCenter(position, actionIndex) {
 	return position.y + HEADER_HEIGHT + actionIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
 }
 
-function getActions(node) {
-	return Array.isArray(node?.actions) ? node.actions : [];
-}
-
-function getTarget(action) {
-	return typeof action === "object" && typeof action?.nextNodeId === "string"
-		? action.nextNodeId
-		: "";
-}
-
 // Layered left-to-right layout: column = shortest distance from the root.
 export function computeAutoLayout(solution) {
-	const nodes = solution?.nodes || {};
+	const nodes = getSolutionNodes(solution) || {};
 	const ids = Object.keys(nodes);
-	const rootId = Object.hasOwn(nodes, solution?.rootNodeId)
-		? solution.rootNodeId
-		: ids[0];
+	const rootNodeId = getRootNodeId(solution);
+	const rootId = Object.hasOwn(nodes, rootNodeId) ? rootNodeId : ids[0];
 	const depth = new Map();
 
 	if (rootId) {
@@ -39,8 +34,8 @@ export function computeAutoLayout(solution) {
 		const queue = [rootId];
 		for (let head = 0; head < queue.length; head += 1) {
 			const id = queue[head];
-			for (const { action } of getOrderedActions(getActions(nodes[id]))) {
-				const target = getTarget(action);
+			for (const { action } of getOrderedActions(getNodeActions(nodes[id]))) {
+				const target = getActionTarget(action);
 				if (target && Object.hasOwn(nodes, target) && !depth.has(target)) {
 					const targetDepth = depth.get(id) + 1;
 					depth.set(target, targetDepth);
@@ -60,8 +55,8 @@ export function computeAutoLayout(solution) {
 	const children = new Map(ids.map((id) => [id, []]));
 	for (const id of ids) {
 		const targets = new Set();
-		for (const { action } of getOrderedActions(getActions(nodes[id]))) {
-			const target = getTarget(action);
+		for (const { action } of getOrderedActions(getNodeActions(nodes[id]))) {
+			const target = getActionTarget(action);
 			if (
 				target &&
 				Object.hasOwn(nodes, target) &&
@@ -86,7 +81,7 @@ export function computeAutoLayout(solution) {
 			.get(id)
 			.filter((target) => !active.has(target));
 		if (childIds.length === 0) {
-			const height = getNodeHeight(getActions(nodes[id]).length);
+			const height = getNodeHeight(getNodeActions(nodes[id]).length);
 			layout[id] = {
 				x: depth.get(id) * (NODE_WIDTH + COLUMN_GAP),
 				y: nextLeafY,
@@ -110,10 +105,10 @@ export function computeAutoLayout(solution) {
 		const firstChild = layout[visibleChildIds[0]];
 		const lastChild = layout[visibleChildIds.at(-1)];
 		const firstCenter =
-			firstChild.y + getNodeHeight(getActions(nodes[visibleChildIds[0]]).length) / 2;
+			firstChild.y + getNodeHeight(getNodeActions(nodes[visibleChildIds[0]]).length) / 2;
 		const lastCenter =
-			lastChild.y + getNodeHeight(getActions(nodes[visibleChildIds.at(-1)]).length) / 2;
-		const height = getNodeHeight(getActions(nodes[id]).length);
+			lastChild.y + getNodeHeight(getNodeActions(nodes[visibleChildIds.at(-1)]).length) / 2;
+		const height = getNodeHeight(getNodeActions(nodes[id]).length);
 		layout[id] = {
 			x: depth.get(id) * (NODE_WIDTH + COLUMN_GAP),
 			y: (firstCenter + lastCenter) / 2 - height / 2,
@@ -130,11 +125,11 @@ export function computeAutoLayout(solution) {
 }
 
 export function buildEdges(solution) {
-	const nodes = solution?.nodes || {};
+	const nodes = getSolutionNodes(solution) || {};
 	const edges = [];
 	for (const [from, node] of Object.entries(nodes)) {
-		getOrderedActions(getActions(node)).forEach(({ action, visualIndex }) => {
-			const to = getTarget(action);
+		getOrderedActions(getNodeActions(node)).forEach(({ action, visualIndex }) => {
+			const to = getActionTarget(action);
 			if (to && Object.hasOwn(nodes, to)) {
 				edges.push({ id: `${from}:${visualIndex}`, from, to, actionIndex: visualIndex });
 			}

@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { FlaggedContext } from "../utils/checkRange";
+import { FlaggedContext } from "../utils/flaggedSpots";
 
 export default function Btn({ id, selected, onSelect, children }) {
 	const flagged = useContext(FlaggedContext).has(id);

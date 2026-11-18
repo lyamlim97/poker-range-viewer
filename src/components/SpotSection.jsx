@@ -1,6 +1,8 @@
 import { useState } from "react";
-import Btn from "./Btn";
+import ButtonRow from "./ButtonRow";
+import CollapsibleHeader from "./CollapsibleHeader";
 import { columnsFor } from "../utils/positions";
+import { SPOT_SEPARATOR } from "../utils/flaggedSpots";
 
 export default function SpotSection({
 	title,
@@ -33,12 +35,15 @@ export default function SpotSection({
 
 	return (
 		<section className={`section ${className}`}>
-			<h2 className="section-toggle" onClick={() => setSectionOpen(!sectionOpen)}>
+			<CollapsibleHeader
+				className="section-toggle"
+				open={sectionOpen}
+				onToggle={() => setSectionOpen(!sectionOpen)}
+			>
 				<span>
 					{title} <span className="h2-note">{note}</span>
 				</span>
-				<span className="toggle-arrow">{sectionOpen ? "▼" : "▶"}</span>
-			</h2>
+			</CollapsibleHeader>
 
 			{sectionOpen && (
 				<div className="section-content">
@@ -46,10 +51,14 @@ export default function SpotSection({
 						const isOpen = isOpenerOpen(opener);
 						return (
 							<div className="opener-group" key={opener}>
-								<h3 className="opener-label" onClick={() => toggleOpen(opener)}>
+								<CollapsibleHeader
+									as="h3"
+									className="opener-label"
+									open={isOpen}
+									onToggle={() => toggleOpen(opener)}
+								>
 									<span>{opener} RFI</span>
-									<span className="toggle-arrow">{isOpen ? "▼" : "▶"}</span>
-								</h3>
+								</CollapsibleHeader>
 
 								{isOpen && (
 									<div className="opener-content">
@@ -57,28 +66,19 @@ export default function SpotSection({
 											const size = (name) => name.split("+").length;
 											const newGroup = i > 0 && size(row) !== size(all[i - 1][0]);
 											return (
-												<div className={newGroup ? "row group-start" : "row"} key={row}>
-													<span className="row-label">{rowLabel(row)}</span>
-													<div
-														className="buttons"
-														style={{ gridTemplateColumns: `repeat(${columns.length}, 44px)` }}
-													>
-														{columns.map((col) =>
-															buttons && col in buttons ? (
-																<Btn
-																	key={col}
-																	id={`${title} > ${opener} > ${row} > ${col}`}
-																	selected={selected}
-																	onSelect={onSelect}
-																>
-																	{col}
-																</Btn>
-															) : (
-																<span key={col} />
-															)
-														)}
-													</div>
-												</div>
+												<ButtonRow
+													key={row}
+													className={newGroup ? "row group-start" : "row"}
+													label={rowLabel(row)}
+													columns={columns}
+													buttons={buttons}
+													columnWidth={44}
+													getId={(col) =>
+														[title, opener, row, col].join(SPOT_SEPARATOR)
+													}
+													selected={selected}
+													onSelect={onSelect}
+												/>
 											);
 										})}
 									</div>

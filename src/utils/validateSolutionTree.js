@@ -1,118 +1,21 @@
 import {
 	checkNodeRangeConsistency,
 } from "./checkRange";
-
-const POSITION_IDS = new Set(["EP", "MP", "CO", "BU", "SB", "BB"]);
-const POSITION_ORDER = ["EP", "MP", "CO", "BU", "SB", "BB"];
-
-function getNodeEntries(rawNodes) {
-	if (Array.isArray(rawNodes)) {
-		return rawNodes.map((node, index) => ({
-			key: node?.nodeId,
-			node,
-			index,
-			isArray: true,
-		}));
-	}
-
-	if (rawNodes && typeof rawNodes === "object") {
-		return Object.entries(rawNodes).map(([key, node], index) => ({
-			key,
-			node,
-			index,
-			isArray: false,
-		}));
-	}
-
-	return [];
-}
-
-function getActionKeys(action) {
-	if (typeof action === "string") return [action];
-	return [action?.label, action?.id].filter((key) => typeof key === "string" && key);
-}
-
-function isAlmostNeverReached(value) {
-	return (
-		Array.isArray(value?.tags) &&
-		value.tags.includes("almost-never-reached")
-	);
-}
-
-function parseNodeHistory(nodeId) {
-	const parts = nodeId.split("_");
-	if (parts.length % 2 === 0 || !POSITION_IDS.has(parts[parts.length - 1])) {
-		return null;
-	}
-
-	const history = [];
-	for (let index = 0; index < parts.length - 1; index += 2) {
-		if (!POSITION_IDS.has(parts[index]) || !parts[index + 1]) return null;
-		history.push({ position: parts[index], actionToken: parts[index + 1] });
-	}
-
-	return { history, currentPosition: parts[parts.length - 1] };
-}
-
-function isAggressiveToken(actionToken) {
-	return /^(?:RFI|SQZ|AI|\d+B)$/i.test(actionToken);
-}
-
-function getActionToken(action, history) {
-	const label = (getActionKeys(action)[0] || "").trim();
-	if (/^fold\b/i.test(label)) return "F";
-	if (/^call\b/i.test(label)) return "C";
-	if (/^check\b/i.test(label)) return "X";
-	if (/^(?:all[\s-]*in|jam|AI)\b/i.test(label)) return "AI";
-	if (/\b(?:squeeze|SQZ)\b/i.test(label)) return "SQZ";
-
-	let lastAggressionIndex = -1;
-	for (let index = history.length - 1; index >= 0; index--) {
-		if (isAggressiveToken(history[index].actionToken)) {
-			lastAggressionIndex = index;
-			break;
-		}
-	}
-	const callsAfterLastAggression = history
-		.slice(lastAggressionIndex + 1)
-		.some(({ actionToken }) => actionToken === "C");
-	const raiseCount = history.filter(({ actionToken }) =>
-		isAggressiveToken(actionToken)
-	).length;
-	const isSqueeze = raiseCount === 1 && callsAfterLastAggression;
-
-	const numberedBet = label.match(/\b(\d+)\s*[- ]?\s*bet\b/i);
-	if (numberedBet) {
-		if (numberedBet[1] === "3" && isSqueeze) return "SQZ";
-		return `${numberedBet[1]}B`;
-	}
-	const wordBet = label.match(/\b(three|four|five|six|seven|eight|nine)[\s-]*bet\b/i);
-	if (wordBet) {
-		const betNumbers = {
-			three: 3,
-			four: 4,
-			five: 5,
-			six: 6,
-			seven: 7,
-			eight: 8,
-			nine: 9,
-		};
-		if (wordBet[1].toLowerCase() === "three" && isSqueeze) return "SQZ";
-		return `${betNumbers[wordBet[1].toLowerCase()]}B`;
-	}
-
-	if (/^open\b/i.test(label)) return "RFI";
-	if (/^raise\b/i.test(label)) {
-		if (raiseCount === 0) return "RFI";
-		if (isSqueeze) return "SQZ";
-		return `${raiseCount + 2}B`;
-	}
-
-	return null;
-}
+import { getActionToken, getNodeIdPosition, isAggressiveToken, parseNodeId } from "./nodeId";
+import { POSITIONS, POSITION_IDS } from "./positions";
+import {
+	getActionLabel,
+	getActionRange,
+	getNodeActions,
+	getRootNodeId,
+	getSolutionNodes,
+	hasRareTag,
+	isRareAction,
+	isTerminalAction,
+} from "./solutionAccessors";
 
 export function getExpectedNextNodeId(sourceNodeId, action) {
-	const parsedSource = parseNodeHistory(sourceNodeId);
+	const parsedSource = parseNodeId(sourceNodeId);
 	if (!parsedSource) return null;
 
 	const actionToken = getActionToken(action, parsedSource.history);
@@ -139,9 +42,9 @@ export function getExpectedNextNodeId(sourceNodeId, action) {
 		}
 	}
 
-	const currentIndex = POSITION_ORDER.indexOf(parsedSource.currentPosition);
-	for (let offset = 1; offset <= POSITION_ORDER.length; offset++) {
-		const nextPosition = POSITION_ORDER[(currentIndex + offset) % POSITION_ORDER.length];
+	const currentIndex = POSITIONS.indexOf(parsedSource.currentPosition);
+	for (let offset = 1; offset <= POSITIONS.length; offset++) {
+		const nextPosition = POSITIONS[(currentIndex + offset) % POSITIONS.length];
 		if (folded.has(nextPosition) || allIn.has(nextPosition)) continue;
 		if (actedSinceRaise.has(nextPosition)) continue;
 		if (lastAggressor && nextPosition === lastAggressor) continue;
@@ -151,20 +54,8 @@ export function getExpectedNextNodeId(sourceNodeId, action) {
 	return { nodeId: null };
 }
 
-function getMappedTarget(node, action) {
-	for (const key of getActionKeys(action)) {
-		const target = node.next?.[key] ?? node.children?.[key];
-		if (target != null) return target;
-	}
-	return null;
-}
-
-
 function getTargetLabel(target) {
 	if (typeof target === "string") return target.trim() ? target : "(empty target)";
-	if (target && typeof target.nodeId === "string" && target.nodeId.trim()) {
-		return target.nodeId;
-	}
 	if (target == null) return "(missing target)";
 	return "(invalid target)";
 }
@@ -180,11 +71,9 @@ function getCanonicalCycle(cycle) {
 }
 
 export function validateSolutionTree(solutionData = {}) {
-	const rawNodes = solutionData?.nodes ?? solutionData?.tree?.nodes;
-	const entries = getNodeEntries(rawNodes);
+	const entries = Object.entries(getSolutionNodes(solutionData) || {});
 	const nodes = new Map();
 	const invalidNodeIds = new Set();
-	const duplicateNodeIds = new Set();
 	const positionMismatches = [];
 	const issues = [];
 	const nodeIssues = {};
@@ -223,36 +112,28 @@ export function validateSolutionTree(solutionData = {}) {
 		addIssue(category, severity, null, details);
 	}
 
-	for (const entry of entries) {
-		const nodeId = typeof entry.key === "string" ? entry.key : "";
+	for (const [index, [nodeId, node]] of entries.entries()) {
 		if (!nodeId) {
-			invalidNodeIds.add(entry.isArray ? `[nodes ${entry.index}]` : "(empty node key)");
+			invalidNodeIds.add("(empty node key)");
 			addSolutionIssue("invalid-node-id", "error", {
 				message: "A node key is empty or invalid.",
-				nodeIndex: entry.index,
-			});
-			continue;
-		}
-		if (nodes.has(nodeId)) {
-			duplicateNodeIds.add(nodeId);
-			addIssue("duplicate-node-id", "error", nodeId, {
-				message: `Node ID "${nodeId}" appears more than once.`,
+				nodeIndex: index,
 			});
 			continue;
 		}
 
-		nodes.set(nodeId, entry.node);
-		if (!entry.isArray && entry.node?.nodeId !== nodeId) {
-			invalidNodeIds.add(`${nodeId} / ${entry.node?.nodeId || "(missing nodeId)"}`);
+		nodes.set(nodeId, node);
+		if (node?.nodeId !== nodeId) {
+			invalidNodeIds.add(`${nodeId} / ${node?.nodeId || "(missing nodeId)"}`);
 			addIssue("node-id-mismatch", "error", nodeId, {
-				message: `Node object nodeId "${entry.node?.nodeId || "(missing)"}" does not match key "${nodeId}".`,
-				declaredNodeId: entry.node?.nodeId || null,
+				message: `Node object nodeId "${node?.nodeId || "(missing)"}" does not match key "${nodeId}".`,
+				declaredNodeId: node?.nodeId || null,
 			});
 		}
-		if (entry.node && typeof entry.node === "object") {
-			const idPosition = nodeId.split("_").pop();
-			const declaredPosition = entry.node.position;
-			const isEndpoint = entry.node.terminal === true;
+		if (node && typeof node === "object") {
+			const idPosition = getNodeIdPosition(nodeId);
+			const declaredPosition = node.position;
+			const isEndpoint = node.terminal === true;
 			const hasIdPosition = POSITION_IDS.has(idPosition);
 			const hasDeclaredPosition = POSITION_IDS.has(declaredPosition);
 			if (hasIdPosition && hasDeclaredPosition && idPosition !== declaredPosition) {
@@ -281,11 +162,7 @@ export function validateSolutionTree(solutionData = {}) {
 		}
 	}
 
-	for (const nodeId of duplicateNodeIds) {
-		invalidNodeIds.add(nodeId);
-	}
-
-	const rootNodeId = solutionData?.rootNodeId || solutionData?.tree?.root;
+	const rootNodeId = getRootNodeId(solutionData);
 	const missingTargets = [];
 	const missingTargetKeys = new Set();
 	const actionsWithoutRange = [];
@@ -333,14 +210,13 @@ export function validateSolutionTree(solutionData = {}) {
 		adjacency.get(sourceNodeId)?.add(target);
 	}
 
-	function checkActionTarget(sourceNodeId, action, target) {
-		const targetNodeId = typeof target === "string" ? target : target?.nodeId;
+	function checkActionTarget(sourceNodeId, action, targetNodeId) {
 		if (typeof targetNodeId !== "string" || !nodes.has(targetNodeId)) return;
 
 		const expected = getExpectedNextNodeId(sourceNodeId, action);
 		if (!expected || targetNodeId === expected.nodeId) return;
 
-		const actionLabel = getActionKeys(action)[0] || "(unknown action)";
+		const actionLabel = getActionLabel(action) || "(unknown action)";
 		const key = `${sourceNodeId}\u0000${actionLabel}\u0000${targetNodeId}`;
 		if (wronglyLinkedKeys.has(key)) return;
 		wronglyLinkedKeys.add(key);
@@ -358,11 +234,8 @@ export function validateSolutionTree(solutionData = {}) {
 		});
 	}
 
-	if (typeof rootNodeId !== "string" || !nodes.has(rootNodeId)) {
-		const targetNodeId =
-			typeof rootNodeId === "string" && rootNodeId
-				? rootNodeId
-				: "(missing rootNodeId)";
+	if (!rootNodeId || !nodes.has(rootNodeId)) {
+		const targetNodeId = rootNodeId || "(missing rootNodeId)";
 		missingTargets.push({ sourceNodeId: "rootNodeId", targetNodeId });
 		addSolutionIssue("invalid-root", "error", {
 			message: `Root node "${targetNodeId}" does not exist.`,
@@ -376,9 +249,9 @@ export function validateSolutionTree(solutionData = {}) {
 			continue;
 		}
 
-		const actions = Array.isArray(node.actions) ? node.actions : [];
+		const actions = getNodeActions(node);
 		const isEndpoint = node.terminal === true;
-		if (isAlmostNeverReached(node)) {
+		if (hasRareTag(node)) {
 			misplacedRareNodeTags.add(nodeId);
 			addIssue("rare-node-tag", "error", nodeId, {
 				message: "The almost-never-reached tag belongs on an action, not a node.",
@@ -398,44 +271,27 @@ export function validateSolutionTree(solutionData = {}) {
 		}
 
 		for (const action of actions) {
-			if (
-				typeof action !== "string" &&
-				(!action || typeof action !== "object" || Array.isArray(action))
-			) {
+			if (!action || typeof action !== "object" || Array.isArray(action)) {
 				addIssue("invalid-action", "error", nodeId, {
-					message: "Action must be a string or an object.",
+					message: "Action must be an object.",
 				});
 				continue;
 			}
-			const actionLabel = getActionKeys(action)[0] || "(unknown action)";
-			const strategyRange = getActionKeys(action)
-				.map((key) => node.strategy?.[key])
-				.find((rangeText) => typeof rangeText === "string");
-			const rangeText =
-				typeof action?.rawRangeText === "string"
-					? action.rawRangeText
-					: strategyRange;
-			if (typeof rangeText !== "string") {
+			const actionLabel = getActionLabel(action) || "(unknown action)";
+			if (getActionRange(action) === null) {
 				actionsWithoutRange.push(`${nodeId} — ${actionLabel}`);
 				addIssue("missing-range", "warning", nodeId, {
 					message: `Action "${actionLabel}" has no range.`,
 					action: actionLabel,
-					actionId: typeof action?.id === "string" ? action.id : null,
+					actionId: typeof action.id === "string" ? action.id : null,
 				});
 			}
 
-			const directTarget =
-				action && typeof action === "object" ? action.nextNodeId : null;
-			const isTerminalAction =
-				action && typeof action === "object" && action.terminal === true;
-			const isRareAction = isAlmostNeverReached(action);
-			const mappedTarget = getMappedTarget(node, action);
-			const target = directTarget ?? mappedTarget;
+			const target = action.nextNodeId;
+			const isTerminal = isTerminalAction(action);
+			const isRare = isRareAction(action);
 
-			if (
-				(isTerminalAction || isRareAction) &&
-				(directTarget != null || mappedTarget != null)
-			) {
+			if ((isTerminal || isRare) && target != null) {
 				outcomeActionsWithLinks.add(nodeId);
 				addIssue("outcome-action-with-target", "error", nodeId, {
 					message: `Action "${actionLabel}" is terminal or rare but has a target.`,
@@ -444,9 +300,9 @@ export function validateSolutionTree(solutionData = {}) {
 			}
 			if (
 				!isEndpoint &&
-				!isTerminalAction &&
-				!isRareAction &&
-				!(typeof directTarget === "string" && directTarget.trim())
+				!isTerminal &&
+				!isRare &&
+				!(typeof target === "string" && target.trim())
 			) {
 				actionsWithoutNextNode.set(
 					nodeId,
@@ -455,7 +311,7 @@ export function validateSolutionTree(solutionData = {}) {
 				addIssue("missing-next-node", "warning", nodeId, {
 					message: `Action "${actionLabel}" has no nextNodeId.`,
 					action: actionLabel,
-					actionId: typeof action?.id === "string" ? action.id : null,
+					actionId: typeof action.id === "string" ? action.id : null,
 				});
 			}
 			if (target != null) {
@@ -465,67 +321,31 @@ export function validateSolutionTree(solutionData = {}) {
 			}
 		}
 
-		for (const mapping of [node.next, node.children]) {
-			if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) continue;
-			for (const [action, target] of Object.entries(mapping)) {
-				if (target != null) {
-					outgoingReferenceNodeIds.add(nodeId);
-					addTarget(nodeId, target);
-					checkActionTarget(nodeId, action, target);
-				}
-			}
-		}
-
 		if (!isEndpoint && actions.length > 0) {
 			const rangeCheck = checkNodeRangeConsistency(solutionData, nodeId);
-			if (rangeCheck?.kind === "100") {
-				for (const issue of [
-					...rangeCheck.over.map((item) => ({ ...item, status: "over" })),
-					...rangeCheck.under.map((item) => ({ ...item, status: "under" })),
-				]) {
-					const category =
-						issue.status === "over"
-							? "range-over-100"
-							: "range-under-100";
-					rangeIssues.push({
-						category,
-						nodeId,
-						hand: issue.hand,
-						total: issue.total,
-					});
-					addIssue(category, "warning", nodeId, {
-						message: `Hand "${issue.hand}" action frequencies add up to ${+(issue.total * 100).toFixed(1)}%, not 100%.`,
-						hand: issue.hand,
-						total: issue.total,
-					});
-				}
-			} else if (rangeCheck?.kind === "previous") {
-				for (const issue of [
-					...rangeCheck.over.map((item) => ({ ...item, status: "over" })),
-					...rangeCheck.under.map((item) => ({ ...item, status: "under" })),
-					...rangeCheck.mismatch.map((item) => ({ ...item, status: "mismatch" })),
-				]) {
-					const category =
-						issue.status === "over"
-							? "range-over-previous"
-							: issue.status === "under"
-								? "range-under-previous"
-								: "range-mismatch-previous";
-					rangeIssues.push({
-						category,
-						nodeId,
-						hand: issue.hand,
-						total: issue.total,
-						expected: issue.expected,
-						previousAction: rangeCheck.previous.action,
-					});
-					addIssue(category, "warning", nodeId, {
-						message: `Hand "${issue.hand}" totals ${+(issue.total * 100).toFixed(1)}%; ${rangeCheck.previous.action} previously allowed ${+(issue.expected * 100).toFixed(1)}%.`,
-						hand: issue.hand,
-						total: issue.total,
-						expected: issue.expected,
-						previousAction: rangeCheck.previous.action,
-					});
+			const isPrevious = rangeCheck?.kind === "previous";
+			if (rangeCheck?.kind === "100" || isPrevious) {
+				const suffix = isPrevious ? "previous" : "100";
+				for (const status of ["over", "under", "mismatch"]) {
+					for (const issue of rangeCheck[status] ?? []) {
+						const category = `range-${status}-${suffix}`;
+						const details = {
+							hand: issue.hand,
+							total: issue.total,
+							...(isPrevious && {
+								expected: issue.expected,
+								previousAction: rangeCheck.previous.action,
+							}),
+						};
+						const percent = +(issue.total * 100).toFixed(1);
+						rangeIssues.push({ category, nodeId, ...details });
+						addIssue(category, "warning", nodeId, {
+							message: isPrevious
+								? `Hand "${issue.hand}" totals ${percent}%; ${rangeCheck.previous.action} previously allowed ${+(issue.expected * 100).toFixed(1)}%.`
+								: `Hand "${issue.hand}" action frequencies add up to ${percent}%, not 100%.`,
+							...details,
+						});
+					}
 				}
 			}
 		}
@@ -539,7 +359,7 @@ export function validateSolutionTree(solutionData = {}) {
 	}
 
 	const reachableNodeIds = new Set();
-	if (typeof rootNodeId === "string" && nodes.has(rootNodeId)) {
+	if (rootNodeId && nodes.has(rootNodeId)) {
 		const pending = [rootNodeId];
 		while (pending.length > 0) {
 			const nodeId = pending.pop();
