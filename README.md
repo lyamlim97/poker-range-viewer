@@ -29,13 +29,13 @@ To add or update a scenario preset, edit the corresponding `ranges-*.json` file 
 
 The **Range Viewer** mode reads solution files from `src/data/solutions/`. To add a solution, place its `.json` file in that folder and add its display metadata to `src/data/solution-index.json` using the file name without the `.json` extension as `id`. The viewer fetches only the selected solution, then parses its node ranges while showing progress. The included [example solution](./src/data/solutions/example-solution.json) demonstrates a small linked tree; its ranges are illustrative, not solver output.
 
-After editing the selected solution file while the app is running, select **Reload** to fetch and parse its latest contents without a full-page refresh. The viewer keeps the current action path if it still resolves; otherwise it returns to the root.
+After editing the selected solution file while the app is running, select **Reload** to fetch, parse, and fully validate its latest contents without a full-page refresh. The viewer keeps the current action path if it still resolves; otherwise it returns to the root.
 
 Select **Change** to choose a solution. Select an action in the tree to follow that branch. The tree shows the action history and previews later positions assuming intervening players fold. Select a previous action to rewind and explore a different branch. The range grid and sidebar show the current node's action frequencies and combo details.
 
 When a position acts again later in the tree, the viewer checks that node's combined action frequencies against that position's most recent prior action range. For example, EP's later response is checked against EP's earlier raise range. Positions with no prior action range continue to be checked against 100%.
 
-The **Tree validation** section at the bottom checks actions without `rawRangeText`, missing node targets, actions without `nextNodeId`, unreachable nodes, cycles, invalid node IDs or positions, and branches that do not end at a terminal or almost-never-reached node. Continuing actions must link to an explicit node; terminal and almost-never-reached actions are endpoints and do not link to another decision.
+The **Tree validation** section at the bottom shows the full report generated when the selected solution loads or reloads. It checks actions without `rawRangeText`, missing node targets, actions without `nextNodeId`, unreachable nodes, cycles, invalid node IDs or positions, and branches that do not end at a terminal or almost-never-reached node. Continuing actions must link to an explicit node; terminal and almost-never-reached actions are endpoints and do not link to another decision.
 
 ## 4. Range DAG
 

@@ -141,6 +141,7 @@ export default function DagEditor({
 		data: null,
 		error: null,
 		diskRevision: null,
+		validationReport: null,
 	});
 	const [selectedNodeId, setSelectedNodeId] = useState("");
 	const [selectedActionKey, setSelectedActionKey] = useState("");
@@ -163,7 +164,6 @@ export default function DagEditor({
 	const [revision, setRevision] = useState(0);
 	const [savedRevision, setSavedRevision] = useState(0);
 	const [saveState, setSaveState] = useState({ status: "saved" });
-	const [validationReport, setValidationReport] = useState(null);
 	const [retrySave, setRetrySave] = useState(0);
 	const [conflictRevision, setConflictRevision] = useState(null);
 	const saveQueueRef = useRef(Promise.resolve());
@@ -175,6 +175,9 @@ export default function DagEditor({
 	const solution =
 		loadMatchesSelection && loadState.status === "ready" ? loadState.data : null;
 	const diskRevision = loadMatchesSelection ? loadState.diskRevision : null;
+	const validationReport = loadMatchesSelection
+		? loadState.validationReport
+		: null;
 	const solutionMetadata = solutionIndex.find(
 		(item) => item.id === selectedSolutionId
 	);
@@ -313,6 +316,7 @@ export default function DagEditor({
 				if (!dataNodes) {
 					throw new Error("The solution must contain a nodes object.");
 				}
+				const report = validateSolutionTree(data);
 				if (cancelled) return;
 
 				setLoadState({
@@ -322,6 +326,7 @@ export default function DagEditor({
 					data,
 					error: null,
 					diskRevision: canWriteFiles ? body.revision : null,
+					validationReport: report,
 				});
 				const rootNodeId = getRootNodeId(data);
 				setSelectedNodeId(
@@ -333,7 +338,6 @@ export default function DagEditor({
 				setRevision(0);
 				setSavedRevision(0);
 				setSaveState({ status: "saved" });
-				setValidationReport(null);
 				setConflictRevision(null);
 				setAddActionError("");
 				setGroupPresetId("fold-call");
@@ -352,6 +356,7 @@ export default function DagEditor({
 					data: null,
 					error: error instanceof Error ? error.message : String(error),
 					diskRevision: null,
+					validationReport: null,
 				});
 			}
 		}
@@ -383,7 +388,11 @@ export default function DagEditor({
 				.catch(() => { })
 				.then(async () => {
 					const report = validateSolutionTree(snapshot);
-					setValidationReport(report);
+					setLoadState((current) =>
+						current.solutionId === solutionId && current.data === snapshot
+							? { ...current, validationReport: report }
+							: current
+					);
 
 					const structureError = validateBasicSolutionStructure(snapshot);
 					if (structureError) {

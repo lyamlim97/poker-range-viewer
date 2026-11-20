@@ -20,6 +20,7 @@ import {
 	fetchSolutionJson,
 	getSolutionAssetUrl,
 } from "./utils/solutionLoader";
+import { validateSolutionTree } from "./utils/validateSolutionTree";
 import { copyTextToClipboard, yieldToBrowser } from "./utils/download";
 import "./App.css";
 
@@ -122,6 +123,17 @@ export default function RangeViewer({
 				}
 
 				if (cancelled) return;
+				setLoadState(
+					makeLoadState(solutionKey, loadAttempt, solutionUrls, "validating", {
+						progress: 100,
+						parsedNodes: entries.length,
+						totalNodes: entries.length,
+					})
+				);
+				await yieldToBrowser();
+
+				if (cancelled) return;
+				const validationReport = validateSolutionTree(solutionData);
 				const rootPosition =
 					getNextPosition([], solutionData) ||
 					selectedSolution?.rootPosition ||
@@ -151,6 +163,7 @@ export default function RangeViewer({
 						parsedNodes: entries.length,
 						totalNodes: entries.length,
 						data: solutionData,
+						validationReport,
 					})
 				);
 			} catch (error) {
@@ -311,6 +324,8 @@ export default function RangeViewer({
 							Parsing ranges: {parsedNodes} of {totalNodes} nodes
 							{totalNodes > 0 ? ` (${progress}%)` : ""}
 						</p>
+					) : phase === "validating" ? (
+						<p>Validating the full solution tree...</p>
 					) : (
 						<p>Loading the selected solution file...</p>
 					)}
@@ -318,7 +333,7 @@ export default function RangeViewer({
 						<progress
 							aria-label="Loading selected solution"
 							max="100"
-							value={phase === "parsing" ? progress : undefined}
+							value={phase === "parsing" || phase === "validating" ? progress : undefined}
 						/>
 					)}
 					{phase === "error" && (
@@ -421,7 +436,10 @@ export default function RangeViewer({
 				)}
 			</div>
 
-			<TreeValidation solutionData={currentRangesData} />
+			<TreeValidation
+				solutionData={currentRangesData}
+				report={loadState.validationReport}
+			/>
 
 			{/* Solution Selection Modal */}
 			{solutionModal}

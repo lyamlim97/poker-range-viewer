@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { validateSolutionTree } from "../utils/validateSolutionTree";
 import { getValidationGroups } from "../utils/reports";
 
-export default function TreeValidation({ solutionData }) {
+export default function TreeValidation({ solutionData, report: loadedReport }) {
 	const report = useMemo(
-		() => validateSolutionTree(solutionData),
-		[solutionData]
+		() => loadedReport || validateSolutionTree(solutionData),
+		[loadedReport, solutionData]
 	);
 	const groups = getValidationGroups(report);
 
