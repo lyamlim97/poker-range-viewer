@@ -91,6 +91,22 @@ function makeActionLabel(kind, size) {
 	return `${type.label} ${sizeText}`;
 }
 
+function getAvailableGroupKinds(presetId, node, groupSizes) {
+	const preset = GROUP_ACTION_PRESETS.find((item) => item.id === presetId);
+	if (!preset) return [];
+	const nodeActions = getNodeActions(node);
+	return preset.actions.filter((kind) => {
+		const label = makeActionLabel(kind, groupSizes[kind] || "");
+		return (
+			label &&
+			!nodeActions.some(
+				(action) =>
+					getActionLabel(action).toLowerCase() === label.toLowerCase()
+			)
+		);
+	});
+}
+
 function updateNode(solution, nodeId, update) {
 	const node = solution.nodes[nodeId];
 	return {
@@ -329,10 +345,12 @@ export default function DagEditor({
 					validationReport: report,
 				});
 				const rootNodeId = getRootNodeId(data);
-				setSelectedNodeId(
+				const initialNodeId =
 					rootNodeId && Object.hasOwn(dataNodes, rootNodeId)
 						? rootNodeId
-						: Object.keys(dataNodes)[0] || ""
+						: Object.keys(dataNodes)[0] || "";
+				setSelectedNodeId(
+					initialNodeId
 				);
 				setSelectedActionKey("");
 				setRevision(0);
@@ -341,10 +359,14 @@ export default function DagEditor({
 				setConflictRevision(null);
 				setAddActionError("");
 				setGroupPresetId("fold-call");
-				setGroupSelectedKinds(["fold", "call"]);
+				setGroupSelectedKinds(
+					getAvailableGroupKinds(
+						"fold-call",
+						dataNodes[initialNodeId],
+						{ raise: "2.5", "all-in": "" }
+					)
+				);
 				setGroupAddError("");
-				setGroupActionsOpen(true);
-				setSingleActionOpen(false);
 				setGroupActionsOpen(true);
 				setSingleActionOpen(false);
 			} catch (error) {
@@ -626,18 +648,9 @@ export default function DagEditor({
 			setGroupSelectedKinds([]);
 			return;
 		}
-		const preset = GROUP_ACTION_PRESETS.find((item) => item.id === presetId);
-		if (!preset) return;
-		const availableKinds = preset.actions.filter((kind) => {
-			const size = groupSizes[kind] || "";
-			const label = makeActionLabel(kind, size);
-			if (!label) return false;
-			return !selectedActions.some(
-				(action) =>
-					getActionLabel(action).toLowerCase() === label.toLowerCase()
-			);
-		});
-		setGroupSelectedKinds(availableKinds);
+		setGroupSelectedKinds(
+			getAvailableGroupKinds(presetId, selectedNode, groupSizes)
+		);
 	}
 
 	function toggleGroupKind(kind) {
@@ -874,7 +887,13 @@ export default function DagEditor({
 		setSelectedActionKey("");
 		setAddActionError("");
 		setGroupPresetId("fold-call");
-		setGroupSelectedKinds(["fold", "call"]);
+		setGroupSelectedKinds(
+			getAvailableGroupKinds(
+				"fold-call",
+				solution?.nodes?.[id],
+				groupSizes
+			)
+		);
 		setGroupAddError("");
 	}
 
@@ -1269,6 +1288,7 @@ export default function DagEditor({
 																label.toLowerCase()
 														)
 													);
+													const checkboxId = `range-editor-group-${type.id}`;
 													return (
 														<div
 															key={type.id}
@@ -1281,20 +1301,26 @@ export default function DagEditor({
 																"--dag-action-color": actionColor(label || type.label),
 															}}
 														>
-															<input
-																type="checkbox"
-																checked={selected}
-																onChange={() => toggleGroupKind(type.id)}
-																disabled={!canWriteFiles || existing}
-															/>
-															<span className="range-editor-group-action-label">
-																{type.label}
-															</span>
-															{existing && (
-																<span className="range-editor-group-existing">
-																	Already exists
+															<label
+																className="range-editor-group-action-choice"
+																htmlFor={checkboxId}
+															>
+																<input
+																	id={checkboxId}
+																	type="checkbox"
+																	checked={selected}
+																	onChange={() => toggleGroupKind(type.id)}
+																	disabled={!canWriteFiles || existing}
+																/>
+																<span className="range-editor-group-action-label">
+																	{type.label}
 																</span>
-															)}
+																{existing && (
+																	<span className="range-editor-group-existing">
+																		Already exists
+																	</span>
+																)}
+															</label>
 															{type.hasSize && selected && !existing && (
 																<input
 																	type="number"
@@ -1317,30 +1343,75 @@ export default function DagEditor({
 											</div>
 
 											{groupPreview.length > 0 && (
-												<div className="range-editor-group-preview">
-													<span>Preview</span>
+												<section
+													className="range-editor-group-preview"
+													aria-label="New action preview"
+												>
+													<div className="range-editor-group-preview-heading">
+														<span>Preview</span>
+														<span>
+															{groupPreview.filter(
+																(item) => item.label && !item.duplicate
+															).length} ready to add
+														</span>
+													</div>
 													{groupPreview.map((item) => (
 														<div
 															key={item.kind}
-															className={
+															className={[
+																"range-editor-group-preview-row",
 																item.duplicate || item.outcome === "invalid"
-																	? "range-editor-group-preview-row warning"
-																	: "range-editor-group-preview-row"
-															}
+																	? "warning"
+																	: "",
+															].filter(Boolean).join(" ")}
+															style={{
+																"--dag-action-color": actionColor(
+																	item.label ||
+																	ACTION_TYPES.find(
+																		(type) => type.id === item.kind
+																	)?.label ||
+																	""
+																),
+															}}
 														>
-															<strong>{item.label || "Invalid size"}</strong>
-															<span>
-																{item.duplicate
-																	? "Already exists"
-																	: item.outcome === "invalid"
-																		? "Enter a valid size"
-																		: item.target
-																			? `Continue to ${item.target}`
-																			: "Terminal fallback"}
-															</span>
+															<div className="range-editor-group-preview-top">
+																<strong>{item.label || "Invalid size"}</strong>
+																<span
+																	className={[
+																		"range-editor-group-preview-status",
+																		item.duplicate || item.outcome === "invalid"
+																			? "warning"
+																			: item.target
+																				? "continue"
+																				: "terminal",
+																	].join(" ")}
+																>
+																	{item.duplicate
+																		? "Exists"
+																		: item.outcome === "invalid"
+																			? "Needs size"
+																			: item.target
+																				? "Continue"
+																				: "End hand"}
+																</span>
+															</div>
+															<div className="range-editor-group-preview-detail">
+																<span>
+																	{item.duplicate
+																		? "Choose another action or size"
+																		: item.outcome === "invalid"
+																			? "Enter a size greater than zero"
+																			: item.target
+																				? "Next decision"
+																				: "No continuation node will be created"}
+																</span>
+																{item.target && !item.duplicate && (
+																	<code>{item.target}</code>
+																)}
+															</div>
 														</div>
 													))}
-												</div>
+												</section>
 											)}
 
 											{groupAddError && (

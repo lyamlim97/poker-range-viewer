@@ -2435,12 +2435,12 @@ button.flagged::after {
 
 .range-editor-group-action {
 	display: grid;
-	grid-template-columns: 16px minmax(0, 1fr) auto;
+	grid-template-columns: minmax(0, 1fr) auto;
 	align-items: center;
-	gap: 7px;
+	gap: 10px;
 	min-width: 0;
-	min-height: 38px;
-	padding: 5px 7px;
+	min-height: 42px;
+	padding: 5px 8px;
 	border: 1px solid var(--border);
 	border-left: 3px solid var(--dag-action-color);
 	border-radius: 6px;
@@ -2454,12 +2454,36 @@ button.flagged::after {
 	background: rgba(247, 84, 84, 0.08);
 }
 
+.range-editor-group-action:not(.existing):hover {
+	border-color: #465364;
+	background: rgba(255, 255, 255, 0.025);
+}
+
+.range-editor-group-action.selected:not(.existing):hover {
+	border-color: rgba(247, 84, 84, 0.7);
+	background: rgba(247, 84, 84, 0.11);
+}
+
 .range-editor-group-action.existing {
 	cursor: not-allowed;
 	opacity: 0.55;
 }
 
+.range-editor-group-action-choice {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	min-height: 30px;
+	cursor: pointer;
+}
+
+.range-editor-group-action.existing .range-editor-group-action-choice {
+	cursor: not-allowed;
+}
+
 .range-editor-group-action input[type="checkbox"] {
+	flex: none;
 	width: 14px;
 	height: 14px;
 	margin: 0;
@@ -2477,6 +2501,7 @@ button.flagged::after {
 }
 
 .range-editor-group-existing {
+	margin-left: auto;
 	color: var(--muted);
 	font-size: 9px;
 	white-space: nowrap;
@@ -2501,43 +2526,101 @@ button.flagged::after {
 
 .range-editor-group-preview {
 	display: grid;
-	gap: 5px;
+	gap: 7px;
 	margin-top: 10px;
-	padding: 8px 9px;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	background: rgba(0, 0, 0, 0.16);
+	padding: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 8px;
+	background:
+		linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 55%),
+		rgba(0, 0, 0, 0.16);
 	color: var(--muted);
 	font-size: 10px;
 }
 
-.range-editor-group-preview > span {
+.range-editor-group-preview-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	color: var(--text);
 	font-weight: 650;
 }
 
+.range-editor-group-preview-heading > span:last-child {
+	color: var(--muted);
+	font-size: 9px;
+	font-weight: 500;
+}
+
 .range-editor-group-preview-row {
+	display: grid;
+	gap: 6px;
+	min-width: 0;
+	padding: 8px 9px;
+	border: 1px solid var(--border);
+	border-left: 3px solid var(--dag-action-color);
+	border-radius: 6px;
+	background: var(--card);
+}
+
+.range-editor-group-preview-row.warning {
+	border-color: rgba(251, 191, 36, 0.28);
+	border-left-color: var(--warn);
+	background: rgba(251, 191, 36, 0.045);
+}
+
+.range-editor-group-preview-top {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
 }
 
-.range-editor-group-preview-row strong {
+.range-editor-group-preview-top strong {
 	min-width: 0;
 	overflow-wrap: anywhere;
-	color: var(--text);
-	font-size: 10px;
+	color: var(--dag-action-color);
+	font-size: 11px;
 }
 
-.range-editor-group-preview-row span {
+.range-editor-group-preview-status {
 	flex: none;
-	max-width: 55%;
-	color: var(--success);
-	text-align: right;
+	padding: 2px 6px;
+	border-radius: 999px;
+	font-size: 9px;
+	font-weight: 650;
 }
 
-.range-editor-group-preview-row.warning span {
+.range-editor-group-preview-status.continue {
+	background: rgba(56, 189, 248, 0.12);
+	color: var(--info);
+}
+
+.range-editor-group-preview-status.terminal {
+	background: rgba(139, 149, 163, 0.15);
+	color: #cbd5e1;
+}
+
+.range-editor-group-preview-status.warning {
+	background: rgba(251, 191, 36, 0.14);
 	color: var(--warn);
+}
+
+.range-editor-group-preview-detail {
+	display: grid;
+	grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+	align-items: baseline;
+	gap: 5px 8px;
+	color: var(--muted);
+	line-height: 1.35;
+}
+
+.range-editor-group-preview-detail code {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	color: #cbd5e1;
+	text-align: right;
 }
 
 .range-editor-group-error {
@@ -2668,6 +2751,18 @@ button.flagged::after {
 	.range-editor-group-presets {
 		align-items: flex-start;
 		flex-direction: column;
+	}
+
+	.range-editor-group-action {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	.range-editor-group-preview-detail {
+		grid-template-columns: 1fr;
+	}
+
+	.range-editor-group-preview-detail code {
+		text-align: left;
 	}
 }
 
