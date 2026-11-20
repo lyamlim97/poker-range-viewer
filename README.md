@@ -41,9 +41,9 @@ The **Tree validation** section at the bottom shows the full report generated wh
 
 The **Range DAG** tab shows the selected solution as a directed graph: each node is a decision, each action row is an output port, and arrows lead to the next decision. Drag a node's header to move it, drag the background to pan, and scroll to zoom (**Fit** and **Auto layout** reset the view). Node positions are remembered per solution in the browser. Click a node or action to inspect it, or use **+ Add** on a node to open the action builder.
 
-The action builder supports Fold, Call, Raise, and All-in actions. Select one or more actions, choose the optional sizes, and review the live preview before adding them. Each preview shows whether the action will continue to a generated decision node, end the hand, needs a valid size, or duplicates an existing action. A continuing action automatically creates and links its next decision node using the established path-style `NodeId` convention and next-position rules; terminal actions do not create a decision node. Advanced continuing, terminal, and almost-never-reached outcomes remain available from the individual **Add an action** form.
+The action builder supports Fold, Call, Raise, and Allin actions in one batch. Select one or more actions, enter the required Raise or Allin sizes, and review the live preview before adding them. Selecting a Raise automatically exposes another Raise row for a different size; duplicate Raise sizes are rejected. Each preview shows whether the action will continue to a generated decision node, end the hand, needs a valid size, or duplicates an existing action. A continuing action automatically creates and links its next decision node using the established path-style `NodeId` convention and next-position rules; terminal actions do not create a decision node.
 
-Select an action to paste its range. The editor stores the pasted text unchanged as that action's `rawRangeText`. New actions start without a range; paste one or use **Mark empty range** when the action intentionally has no combos. Use **Delete range** to remove only the selected action's range, or **Delete action** to remove the action and range from the node. Delete controls are also available directly on each action row in the graph and action list. Actions are displayed visually in this order everywhere: All-in/Jam, Raise family, Call, Fold, then unknown actions. Raise family actions sort 5-Bet, 4-Bet, 3-Bet, Squeeze, Raise/Bet, then numeric size. This sorting does not change the saved JSON. Auto layout uses the same visual action order to arrange future nodes vertically. The node list highlights actions still needing range text.
+Select an action to paste its range. The editor stores the pasted text unchanged as that action's `rawRangeText`. New actions start without a range; paste one or use **Mark empty range** when the action intentionally has no combos. Use **Delete range** to remove only the selected action's range, or **Delete action** to remove the action and range from the node. Delete controls are also available directly on each action row in the graph and action list. Actions are displayed visually in this order everywhere: Allin/Jam, Raise family, Call, Fold, then unknown actions. Raise family actions sort 5-Bet, 4-Bet, 3-Bet, Squeeze, Raise/Bet, then numeric size. This sorting does not change the saved JSON. Auto layout uses the same visual action order to arrange future nodes vertically. The node list highlights actions still needing range text.
 
 Changes are autosaved to the selected `src/data/solutions/<id>.json` file after a short pause, but only when running the local Vite development server (`npm run dev`). The save endpoint writes only existing solution files. If the file changes outside the editor while it is open, autosave stops rather than overwriting the external edit; choose **Overwrite file** to keep the editor's version or **Reload from disk** to discard editor changes and load the external version. In the Range Viewer, use **Reload** to load the latest saved solution.
 
@@ -87,14 +87,14 @@ Action tokens used in IDs:
 | `RFI` | First-in raise |
 | `SQZ` | Squeeze |
 | `3B`, `4B`, `5B` | 3-bet, 4-bet, 5-bet |
-| `AI` | All-in |
+| `AI` | Allin |
 
 Examples:
 
 - `EP` - EP acts first.
 - `EP_F_MP_F_CO_RFI_BU` - EP and MP folded, CO raised first-in, and BU acts.
 - `EP_F_MP_F_CO_RFI_BU_C_SB_F_BB` - CO raised, BU called, SB folded, and BB acts.
-- `EP_RFI_MP_3B_CO_4B_BU_AI_SB` - EP raised, MP 3-bet, CO 4-bet, BU went all-in, and SB acts.
+- `EP_RFI_MP_3B_CO_4B_BU_AI_SB` - EP raised, MP 3-bet, CO 4-bet, BU went Allin, and SB acts.
 
 If the root decision follows earlier folds, include those folds in `rootNodeId`. For example, `EP_F_MP_F_CO_F_BU` starts with BU after EP, MP, and CO have folded.
 

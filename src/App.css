@@ -1368,8 +1368,6 @@ button.flagged::after {
 }
 
 .range-editor-toolbar select,
-.range-editor-add-form select,
-.range-editor-add-form input,
 .range-editor-outcome-editor select {
 	min-height: 34px;
 	padding: 6px 9px;
@@ -1883,9 +1881,69 @@ button.flagged::after {
 	padding: 14px;
 }
 
+.range-editor-node-card {
+	position: relative;
+	padding: 16px;
+	overflow: hidden;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.range-editor-node-card::before {
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	height: 1px;
+	background: linear-gradient(90deg, transparent, rgba(247, 84, 84, 0.55), transparent);
+	content: "";
+	pointer-events: none;
+}
+
 .range-editor-node-heading {
 	align-items: flex-start;
-	margin-bottom: 8px;
+	gap: 16px;
+	margin-bottom: 12px;
+}
+
+.range-editor-node-title {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.range-editor-node-title h2,
+.range-editor-actions-heading > span,
+.range-editor-action-top strong,
+.range-editor-collapse-title > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.range-editor-node-actions {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	min-width: 0;
+}
+
+.range-editor-node-actions .range-editor-count {
+	padding: 4px 8px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: rgba(0, 0, 0, 0.14);
+	white-space: nowrap;
+}
+
+.range-editor-delete-node {
+	height: 32px;
+	min-width: 86px;
+}
+
+.range-editor-delete-node .range-editor-button-icon {
+	width: 14px;
+	height: 14px;
 }
 
 .range-editor-node-issues {
@@ -1958,12 +2016,38 @@ button.flagged::after {
 	font-weight: 650;
 }
 
+.range-editor-node-path-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+	margin-bottom: 14px;
+	padding: 7px 9px;
+	border: 1px solid var(--border);
+	border-radius: 7px;
+	background: linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent), rgba(0, 0, 0, 0.16);
+	color: var(--muted);
+	font-size: 10px;
+}
+
+.range-editor-node-path-row > span {
+	flex: none;
+	font-weight: 650;
+	letter-spacing: 0.35px;
+	text-transform: uppercase;
+}
+
 .range-editor-node-path {
 	display: block;
-	margin-bottom: 12px;
-	padding: 7px 8px;
-	border-radius: 5px;
-	background: rgba(0, 0, 0, 0.18);
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	border-radius: 0;
+	background: transparent;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .range-editor-card > .rv-action-summary {
@@ -1992,10 +2076,41 @@ button.flagged::after {
 	color: var(--warn);
 }
 
+.range-editor-actions-section {
+	margin-top: 14px;
+	padding-top: 13px;
+	border-top: 1px solid var(--border);
+}
+
+.range-editor-actions-heading {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 10px;
+}
+
+.range-editor-actions-heading h3 {
+	flex: none;
+	margin: 0;
+	color: var(--text);
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.35px;
+	text-transform: uppercase;
+}
+
+.range-editor-actions-heading > span {
+	min-width: 0;
+	color: var(--muted);
+	font-size: 10px;
+	text-align: right;
+}
+
 .range-editor-action-list {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-	gap: 7px;
+	gap: 8px;
 }
 
 .range-editor-action-item {
@@ -2004,15 +2119,25 @@ button.flagged::after {
 	min-width: 0;
 	border: 1px solid var(--border);
 	border-left: 3px solid var(--dag-action-color);
-	border-radius: 6px;
+	border-radius: 7px;
 	background: #171d24;
 	overflow: hidden;
+	transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .range-editor-action-item:hover,
 .range-editor-action-item.active {
 	border-color: rgba(247, 84, 84, 0.55);
+	border-left-color: var(--dag-action-color);
 	background: rgba(247, 84, 84, 0.08);
+}
+
+.range-editor-action-item:hover {
+	box-shadow: 0 5px 14px rgba(0, 0, 0, 0.12);
+}
+
+.range-editor-action-item.active {
+	box-shadow: inset 0 0 0 1px rgba(247, 84, 84, 0.08);
 }
 
 .range-editor-action {
@@ -2022,18 +2147,13 @@ button.flagged::after {
 	min-width: 0;
 	width: 100%;
 	height: auto;
-	min-height: 54px;
-	padding: 9px;
+	min-height: 60px;
+	padding: 10px;
 	border: 0;
 	border-radius: 0;
 	background: transparent;
 	color: var(--text);
 	text-align: left;
-}
-
-.range-editor-action:hover,
-.range-editor-action.active {
-	background: rgba(247, 84, 84, 0.08);
 }
 
 .range-editor-action-delete {
@@ -2050,6 +2170,7 @@ button.flagged::after {
 	background: rgba(248, 113, 113, 0.06);
 	color: var(--danger);
 	font-size: 10px;
+	transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .range-editor-action-delete:hover {
@@ -2062,13 +2183,27 @@ button.flagged::after {
 	opacity: 0.45;
 }
 
+.range-editor-action-delete:active:not(:disabled) {
+	transform: translateY(1px);
+}
+
+.range-editor-action:focus-visible,
+.range-editor-action-delete:focus-visible {
+	position: relative;
+	z-index: 1;
+	outline: 2px solid rgba(247, 84, 84, 0.85);
+	outline-offset: -2px;
+}
+
 .range-editor-action-top {
 	align-items: flex-start;
+	min-width: 0;
 }
 
 .range-editor-action-top strong {
+	min-width: 0;
 	font-size: 12px;
-	font-weight: 600;
+	font-weight: 650;
 	color: var(--dag-action-color);
 }
 
@@ -2078,6 +2213,7 @@ button.flagged::after {
 	flex-wrap: wrap;
 	justify-content: flex-end;
 	gap: 5px;
+	max-width: 68%;
 }
 
 .range-editor-action-badge {
@@ -2143,9 +2279,9 @@ button.flagged::after {
 	align-items: center;
 	justify-content: space-between;
 	width: 100%;
-	min-height: 34px;
-	margin: -4px 0 8px;
-	padding: 0 8px;
+	min-height: 44px;
+	margin: -5px 0 10px;
+	padding: 5px 8px;
 	border: 1px solid transparent;
 	border-radius: 6px;
 	background: transparent;
@@ -2172,6 +2308,21 @@ button.flagged::after {
 .range-editor-collapse-toggle[aria-expanded="true"] {
 	border-bottom: 1px solid var(--border);
 	border-radius: 6px 6px 0 0;
+}
+
+.range-editor-collapse-title {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 0;
+}
+
+.range-editor-collapse-title > span:last-child {
+	color: var(--muted);
+	font-size: 10px;
+	font-weight: 400;
+	line-height: 1.35;
 }
 
 .range-editor-collapse-toggle .toggle-arrow {
@@ -2234,9 +2385,14 @@ button.flagged::after {
 
 .range-editor-range-input:focus,
 .range-editor-toolbar select:focus,
-.range-editor-add-form select:focus,
-.range-editor-add-form input:focus {
+.range-editor-outcome-editor select:focus {
 	border-color: rgba(247, 84, 84, 0.7);
+}
+
+.range-editor-outcome-editor select:focus-visible,
+.range-editor-secondary:focus-visible {
+	outline: 2px solid rgba(247, 84, 84, 0.75);
+	outline-offset: 2px;
 }
 
 .range-editor-range-footer {
@@ -2349,26 +2505,6 @@ button.flagged::after {
 	font-size: 10px;
 }
 
-.range-editor-add-form {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(140px, 1fr));
-	align-items: end;
-	gap: 10px;
-}
-
-.range-editor-add-form label {
-	display: flex;
-	flex-direction: column;
-	gap: 5px;
-	color: var(--muted);
-	font-size: 11px;
-}
-
-.range-editor-add-form select,
-.range-editor-add-form input {
-	width: 100%;
-}
-
 .range-editor-group-presets {
 	display: flex;
 	align-items: center;
@@ -2447,10 +2583,12 @@ button.flagged::after {
 	background: #171d24;
 	color: var(--text);
 	cursor: pointer;
+	transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .range-editor-group-action.selected {
 	border-color: rgba(247, 84, 84, 0.5);
+	border-left-color: var(--dag-action-color);
 	background: rgba(247, 84, 84, 0.08);
 }
 
@@ -2464,9 +2602,27 @@ button.flagged::after {
 	background: rgba(247, 84, 84, 0.11);
 }
 
+.range-editor-group-action:focus-within {
+	border-color: rgba(247, 84, 84, 0.7);
+	box-shadow: 0 0 0 2px rgba(247, 84, 84, 0.1);
+}
+
+.range-editor-group-raise-row.trailing {
+	border-style: dashed;
+	background: rgba(0, 0, 0, 0.08);
+}
+
 .range-editor-group-action.existing {
 	cursor: not-allowed;
 	opacity: 0.55;
+}
+
+.range-editor-group-action.range-editor-group-raise-row.existing {
+	border-color: rgba(251, 191, 36, 0.48);
+	border-left-color: var(--warn);
+	background: rgba(251, 191, 36, 0.055);
+	cursor: pointer;
+	opacity: 1;
 }
 
 .range-editor-group-action-choice {
@@ -2478,7 +2634,7 @@ button.flagged::after {
 	cursor: pointer;
 }
 
-.range-editor-group-action.existing .range-editor-group-action-choice {
+.range-editor-group-action.existing:not(.range-editor-group-raise-row) .range-editor-group-action-choice {
 	cursor: not-allowed;
 }
 
@@ -2488,6 +2644,11 @@ button.flagged::after {
 	height: 14px;
 	margin: 0;
 	accent-color: var(--accent);
+}
+
+.range-editor-group-raise-checkbox:focus-visible + .range-editor-group-action-label {
+	text-decoration: underline;
+	text-underline-offset: 2px;
 }
 
 .range-editor-group-action-label {
@@ -2507,6 +2668,15 @@ button.flagged::after {
 	white-space: nowrap;
 }
 
+.range-editor-group-raise-row .range-editor-group-existing {
+	margin-left: 2px;
+	padding: 2px 5px;
+	border-radius: 999px;
+	background: rgba(251, 191, 36, 0.12);
+	color: var(--warn);
+	font-weight: 650;
+}
+
 .range-editor-group-size {
 	width: 70px;
 	min-height: 28px;
@@ -2524,21 +2694,31 @@ button.flagged::after {
 	outline: none;
 }
 
+.range-editor-group-raise-size {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.range-editor-group-raise-size:invalid {
+	border-color: rgba(248, 113, 113, 0.72);
+	box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.08);
+}
+
 .range-editor-group-preview {
 	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 	gap: 7px;
 	margin-top: 10px;
 	padding: 10px;
 	border: 1px solid rgba(255, 255, 255, 0.08);
 	border-radius: 8px;
-	background:
-		linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 55%),
-		rgba(0, 0, 0, 0.16);
+	background: linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 55%), rgba(0, 0, 0, 0.16);
 	color: var(--muted);
 	font-size: 10px;
 }
 
 .range-editor-group-preview-heading {
+	grid-column: 1 / -1;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -2555,6 +2735,7 @@ button.flagged::after {
 
 .range-editor-group-preview-row {
 	display: grid;
+	align-content: start;
 	gap: 6px;
 	min-width: 0;
 	padding: 8px 9px;
@@ -2645,27 +2826,6 @@ button.flagged::after {
 	margin: 0;
 }
 
-.range-editor-id-preview {
-	display: flex;
-	flex-direction: column;
-	gap: 3px;
-	min-width: 0;
-	padding: 7px 9px;
-	border-radius: 5px;
-	background: rgba(0, 0, 0, 0.18);
-	color: var(--muted);
-	font-size: 10px;
-}
-
-.range-editor-id-preview strong {
-	color: var(--text);
-	font-size: 11px;
-}
-
-.range-editor-id-preview code {
-	overflow-wrap: anywhere;
-}
-
 .range-editor-primary {
 	justify-self: start;
 	height: 38px;
@@ -2687,13 +2847,6 @@ button.flagged::after {
 
 .range-editor-primary:active:not(:disabled) {
 	transform: translateY(1px);
-}
-
-.range-editor-form-error {
-	grid-column: 1 / -1;
-	margin: 0;
-	color: #fca5a5;
-	font-size: 11px;
 }
 
 .range-editor-validation {
@@ -2744,8 +2897,19 @@ button.flagged::after {
 		height: 70vh;
 	}
 
-	.range-editor-add-form {
-		grid-template-columns: 1fr;
+	.range-editor-node-heading,
+	.range-editor-actions-heading {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.range-editor-node-actions {
+		justify-content: flex-start;
+	}
+
+	.range-editor-actions-heading > span {
+		text-align: left;
+		white-space: normal;
 	}
 
 	.range-editor-group-presets {
@@ -2753,8 +2917,8 @@ button.flagged::after {
 		flex-direction: column;
 	}
 
-	.range-editor-group-action {
-		grid-template-columns: minmax(0, 1fr) auto;
+	.range-editor-group-preview {
+		grid-template-columns: 1fr;
 	}
 
 	.range-editor-group-preview-detail {

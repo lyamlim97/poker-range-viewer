@@ -21,15 +21,15 @@ export function actionColor(action) {
 
 const FOLD_RE = /^fold\b/i;
 const CALL_RE = /^call\b/i;
-const ALL_IN_RE = /^(?:all[\s-]?in|jam)\b/i;
+const ALL_IN_RE = /^(?:allin|jam)\b/i;
 // Actions are displayed from passive play through increasingly aggressive raises.
 const ACTION_RANK_RES = [
 	/^fold\b/i,
 	/^call\b/i,
 	/^(?:raise|bet)\b/i,
-	/^(?:all[\s-]?in|jam)\b/i,
+	/^(?:allin|jam)\b/i,
 ];
-const AGGRESSIVE_RE = /^(?:raise|bet|all[\s-]?in|jam)/i;
+const AGGRESSIVE_RE = /^(?:raise|bet|allin|jam)/i;
 const AMOUNT_RE = /([\d.]+)\s*(?:bb)?\s*$/i;
 
 export function getActionLabel(action) {

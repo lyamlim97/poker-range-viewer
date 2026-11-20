@@ -35,7 +35,7 @@ export function getActionToken(action) {
 	if (/^fold\b/i.test(label)) return "F";
 	if (/^call\b/i.test(label)) return "C";
 	if (/^check\b/i.test(label)) return "X";
-	if (/^(?:all[\s-]*in|jam|AI)\b/i.test(label)) return "AI";
+	if (/^(?:allin|jam|AI)\b/i.test(label)) return "AI";
 	if (/^open\b/i.test(label) || /^raise\b/i.test(label)) return "R";
 
 	return null;
@@ -46,7 +46,7 @@ export function actionMatchesToken(action, token) {
 	if (token === "F") return /^fold\b/i.test(label);
 	if (token === "C") return /^call\b/i.test(label);
 	if (token === "X") return /^check\b/i.test(label);
-	if (token === "AI") return /^all[\s-]?in\b|^jam\b/i.test(label);
+	if (token === "AI") return /^allin\b|^jam\b/i.test(label);
 	if (/^R$/i.test(token)) return /^raise\b|^open\b/i.test(label);
 	return false;
 }

@@ -49,7 +49,7 @@ const ACTION_TYPES = [
 	{ id: "fold", label: "Fold", hasSize: false },
 	{ id: "call", label: "Call", hasSize: false },
 	{ id: "raise", label: "Raise", hasSize: true },
-	{ id: "all-in", label: "All-in", hasSize: true, optionalSize: true },
+	{ id: "all-in", label: "Allin", hasSize: true },
 ];
 
 const GROUP_ACTION_PRESETS = [
@@ -81,11 +81,31 @@ function getSizeText(value) {
 	return String(Number(amount.toFixed(2)));
 }
 
+function normalizeRaiseActionLabel(label) {
+	const text = String(label || "").trim().toLowerCase();
+	const raiseAction = text.match(/^raise\s+(.+)$/);
+	if (!raiseAction) return text;
+	const sizeText = getSizeText(raiseAction[1]);
+	return sizeText ? `raise ${sizeText}` : text;
+}
+
+function getActionKind(label) {
+	const text = String(label || "").trim().toLowerCase();
+	if (/^fold(?:\s|$)/.test(text)) return "fold";
+	if (/^call(?:\s|$)/.test(text)) return "call";
+	if (/^raise(?:\s|$)/.test(text)) return "raise";
+	if (/^allin\b/.test(text)) return "all-in";
+	return null;
+}
+
+function actionKindExists(actions, kind) {
+	return actions.some((action) => getActionKind(getActionLabel(action)) === kind);
+}
+
 function makeActionLabel(kind, size) {
 	const type = ACTION_TYPES.find((item) => item.id === kind);
 	if (!type) return null;
 	if (!type.hasSize) return type.label;
-	if (kind === "all-in" && !size.trim()) return type.label;
 	const sizeText = getSizeText(size);
 	if (!sizeText) return null;
 	return `${type.label} ${sizeText}`;
@@ -96,12 +116,14 @@ function getAvailableGroupKinds(presetId, node, groupSizes) {
 	if (!preset) return [];
 	const nodeActions = getNodeActions(node);
 	return preset.actions.filter((kind) => {
+		if (kind !== "raise" && actionKindExists(nodeActions, kind)) return false;
 		const label = makeActionLabel(kind, groupSizes[kind] || "");
 		return (
 			label &&
 			!nodeActions.some(
 				(action) =>
-					getActionLabel(action).toLowerCase() === label.toLowerCase()
+					normalizeRaiseActionLabel(getActionLabel(action)) ===
+					normalizeRaiseActionLabel(label)
 			)
 		);
 	});
@@ -162,20 +184,23 @@ export default function DagEditor({
 	const [selectedNodeId, setSelectedNodeId] = useState("");
 	const [selectedActionKey, setSelectedActionKey] = useState("");
 	const [addFocusTick, setAddFocusTick] = useState(0);
-	const addCardRef = useRef(null);
 	const groupCardRef = useRef(null);
 	const [groupActionsOpen, setGroupActionsOpen] = useState(true);
-	const [singleActionOpen, setSingleActionOpen] = useState(false);
-	const [newActionKind, setNewActionKind] = useState("raise");
-	const [newActionSize, setNewActionSize] = useState("2.5");
-	const [newActionOutcome, setNewActionOutcome] = useState("continue");
-	const [addActionError, setAddActionError] = useState("");
 	const [groupPresetId, setGroupPresetId] = useState("fold-call");
 	const [groupSelectedKinds, setGroupSelectedKinds] = useState(["fold", "call"]);
 	const [groupSizes, setGroupSizes] = useState({
 		raise: "2.5",
 		"all-in": "",
 	});
+	const raiseRowIdRef = useRef(0);
+	const makeRaiseRow = () => ({
+		id: `raise-${++raiseRowIdRef.current}`,
+		selected: false,
+		size: "2.5",
+	});
+	const [groupRaiseRows, setGroupRaiseRows] = useState([
+		{ id: "raise-0", selected: false, size: "2.5" },
+	]);
 	const [groupAddError, setGroupAddError] = useState("");
 	const [revision, setRevision] = useState(0);
 	const [savedRevision, setSavedRevision] = useState(0);
@@ -250,49 +275,77 @@ export default function DagEditor({
 		if (!validationReport) return new Set();
 		return new Set(Object.keys(validationReport.nodeIssues || {}));
 	}, [validationReport]);
-	const actionLabel = makeActionLabel(newActionKind, newActionSize);
-	const previewAction = actionLabel ? { label: actionLabel } : null;
-	const nextNodePreview =
-		selectedNode && previewAction
-			? expectedTargetOf(selectedNodeId, previewAction) || null
-			: null;
-	const selectedActionType = ACTION_TYPES.find(
-		(item) => item.id === newActionKind
-	);
-	const effectiveOutcome =
-		newActionOutcome === "continue" && !nextNodePreview
-			? "terminal"
-			: newActionOutcome;
 	const currentLoadStatus = !loadMatchesSelection
 		? "loading"
 		: loadState.status;
 	const groupPreview = useMemo(() => {
 		if (!selectedNode) return [];
-		return groupSelectedKinds.map((kind) => {
-			const size = groupSizes[kind] || "";
-			const label = makeActionLabel(kind, size);
-			if (!label) {
-				return {
-					kind,
-					label: null,
-					target: "",
-					outcome: "invalid",
-					duplicate: false,
-				};
+		const selections = [];
+		for (const type of ACTION_TYPES) {
+			if (type.id === "raise") {
+				if (groupPresetId === "custom") {
+					for (const row of groupRaiseRows.filter((item) => item.selected)) {
+						selections.push({
+							key: row.id,
+							kind: type.id,
+							size: row.size,
+						});
+					}
+				}
+			} else if (groupSelectedKinds.includes(type.id)) {
+				selections.push({
+					key: type.id,
+					kind: type.id,
+					size: groupSizes[type.id] || "",
+				});
 			}
-			const target = expectedTargetOf(selectedNodeId, { label });
-			const duplicate = selectedActions.some(
-				(action) => getActionLabel(action).toLowerCase() === label.toLowerCase()
+		}
+
+		const labels = selections.map((item) =>
+			makeActionLabel(item.kind, item.size)
+		);
+		const selectedLabelCounts = labels.reduce((counts, label) => {
+			if (label) {
+				const normalized = normalizeRaiseActionLabel(label);
+				counts.set(normalized, (counts.get(normalized) || 0) + 1);
+			}
+			return counts;
+		}, new Map());
+		const existingLabels = new Set(
+			selectedActions.map((action) =>
+				normalizeRaiseActionLabel(getActionLabel(action))
+			)
+		);
+
+		return selections.map((item, index) => {
+			const label = labels[index];
+			const normalizedLabel = label ? normalizeRaiseActionLabel(label) : "";
+			const target = label
+				? expectedTargetOf(selectedNodeId, { label })
+				: "";
+			const duplicate = Boolean(
+				label &&
+				(item.kind === "raise"
+					? existingLabels.has(normalizedLabel)
+					: actionKindExists(selectedActions, item.kind))
+			);
+			const duplicateSelected = Boolean(
+				item.kind === "raise" &&
+				label &&
+				selectedLabelCounts.get(normalizedLabel) > 1
 			);
 			return {
-				kind,
+				...item,
 				label,
 				target,
-				outcome: target ? "continue" : "terminal",
+				outcome: label ? (target ? "continue" : "terminal") : "invalid",
 				duplicate,
+				duplicateSelected,
 			};
 		});
 	}, [
+		groupPresetId,
+		groupRaiseRows,
 		groupSelectedKinds,
 		groupSizes,
 		selectedActions,
@@ -302,10 +355,10 @@ export default function DagEditor({
 
 	useEffect(() => {
 		if (addFocusTick === 0) return;
-		const card = groupCardRef.current || addCardRef.current;
+		const card = groupCardRef.current;
 		if (!card) return;
 		card.scrollIntoView({ behavior: "smooth", block: "nearest" });
-		card.querySelector("select, button")?.focus({ preventScroll: true });
+		card.querySelector("button, select, input")?.focus({ preventScroll: true });
 	}, [addFocusTick]);
 
 	useEffect(() => {
@@ -357,7 +410,6 @@ export default function DagEditor({
 				setSavedRevision(0);
 				setSaveState({ status: "saved" });
 				setConflictRevision(null);
-				setAddActionError("");
 				setGroupPresetId("fold-call");
 				setGroupSelectedKinds(
 					getAvailableGroupKinds(
@@ -366,9 +418,10 @@ export default function DagEditor({
 						{ raise: "2.5", "all-in": "" }
 					)
 				);
+				setGroupSizes({ raise: "2.5", "all-in": "" });
+				setGroupRaiseRows([makeRaiseRow()]);
 				setGroupAddError("");
 				setGroupActionsOpen(true);
-				setSingleActionOpen(false);
 			} catch (error) {
 				if (cancelled || error.name === "AbortError") return;
 				setLoadState({
@@ -584,61 +637,6 @@ export default function DagEditor({
 				: next;
 		});
 		setSelectedActionKey(getActionKey(selectedAction, selectedActionIndex));
-		setAddActionError("");
-	}
-
-	function addAction(event) {
-		event.preventDefault();
-		setAddActionError("");
-
-		if (!selectedNode || selectedNode.terminal === true) {
-			setAddActionError("Reopen this terminal node before adding an action.");
-			return;
-		}
-		if (!actionLabel) {
-			setAddActionError("Enter a valid bet size greater than zero.");
-			return;
-		}
-		if (
-			selectedActions.some(
-				(action) =>
-					getActionLabel(action).toLowerCase() === actionLabel.toLowerCase()
-			)
-		) {
-			setAddActionError("This action already exists on the selected node.");
-			return;
-		}
-		if (effectiveOutcome === "continue" && !nextNodePreview) {
-			setAddActionError("There is no next decision position to link to.");
-			return;
-		}
-
-		const action = {
-			id: makeUniqueActionId(actionLabel, selectedActions),
-			label: actionLabel,
-		};
-		if (effectiveOutcome === "continue") {
-			action.nextNodeId = nextNodePreview;
-		} else if (effectiveOutcome === "terminal") {
-			action.terminal = true;
-		} else {
-			action.tags = [RARE_TAG];
-		}
-
-		updateSolution((current) => {
-			const currentNode = current.nodes[selectedNodeId];
-			const next = updateNode(current, selectedNodeId, (node) => ({
-				...node,
-				actions: [...getNodeActions(currentNode), action],
-			}));
-			return effectiveOutcome === "continue"
-				? withPlaceholderNode(next, nextNodePreview)
-				: next;
-		});
-		setSelectedActionKey(action.id);
-		setNewActionKind("raise");
-		setNewActionSize("2.5");
-		setNewActionOutcome("continue");
 	}
 
 	function applyGroupPreset(presetId) {
@@ -646,8 +644,10 @@ export default function DagEditor({
 		setGroupPresetId(presetId);
 		if (presetId === "custom") {
 			setGroupSelectedKinds([]);
+			setGroupRaiseRows([makeRaiseRow()]);
 			return;
 		}
+		setGroupRaiseRows([makeRaiseRow()]);
 		setGroupSelectedKinds(
 			getAvailableGroupKinds(presetId, selectedNode, groupSizes)
 		);
@@ -668,6 +668,29 @@ export default function DagEditor({
 		setGroupAddError("");
 	}
 
+	function toggleGroupRaise(rowId) {
+		setGroupPresetId("custom");
+		setGroupAddError("");
+		setGroupRaiseRows((current) => {
+			const toggled = current.map((row) =>
+				row.id === rowId ? { ...row, selected: !row.selected } : row
+			);
+			const selectedRows = toggled.filter((row) => row.selected);
+			const trailingRow = [...toggled].reverse().find((row) => !row.selected);
+			return [
+				...selectedRows,
+				trailingRow || makeRaiseRow(),
+			];
+		});
+	}
+
+	function updateGroupRaiseSize(rowId, size) {
+		setGroupRaiseRows((current) =>
+			current.map((row) => row.id === rowId ? { ...row, size } : row)
+		);
+		setGroupAddError("");
+	}
+
 	function addActionGroup() {
 		setGroupAddError("");
 		if (!canWriteFiles) {
@@ -678,30 +701,27 @@ export default function DagEditor({
 			setGroupAddError("Reopen this terminal node before adding actions.");
 			return;
 		}
-		if (groupSelectedKinds.length === 0) {
+		if (groupPreview.length === 0) {
 			setGroupAddError("Select at least one action.");
+			return;
+		}
+		if (groupPreview.some((item) => !item.label)) {
+			setGroupAddError("Enter a valid bet size greater than zero.");
+			return;
+		}
+		if (groupPreview.some((item) => item.duplicateSelected)) {
+			setGroupAddError("Each selected Raise must have a unique size.");
+			return;
+		}
+		if (groupPreview.some((item) => item.duplicate)) {
+			const duplicate = groupPreview.find((item) => item.duplicate);
+			setGroupAddError(`This action already exists: ${duplicate.label}.`);
 			return;
 		}
 
 		const usedActions = [...selectedActions];
 		const additions = [];
-		for (const kind of groupSelectedKinds) {
-			const size = groupSizes[kind] || "";
-			const label = makeActionLabel(kind, size);
-			if (!label) {
-				setGroupAddError("Enter a valid bet size greater than zero.");
-				return;
-			}
-			if (
-				usedActions.some(
-					(action) =>
-						getActionLabel(action).toLowerCase() === label.toLowerCase()
-				)
-			) {
-				setGroupAddError(`This action already exists: ${label}.`);
-				return;
-			}
-
+		for (const { label } of groupPreview) {
 			const action = {
 				id: makeUniqueActionId(label, usedActions),
 				label,
@@ -737,6 +757,8 @@ export default function DagEditor({
 		setSelectedActionKey(additions[0].id);
 		setGroupPresetId("custom");
 		setGroupSelectedKinds([]);
+		setGroupSizes({ raise: "2.5", "all-in": "" });
+		setGroupRaiseRows([makeRaiseRow()]);
 		setGroupAddError("");
 	}
 
@@ -885,15 +907,16 @@ export default function DagEditor({
 	function selectNode(id) {
 		setSelectedNodeId(id);
 		setSelectedActionKey("");
-		setAddActionError("");
 		setGroupPresetId("fold-call");
+		setGroupSizes({ raise: "2.5", "all-in": "" });
 		setGroupSelectedKinds(
 			getAvailableGroupKinds(
 				"fold-call",
 				solution?.nodes?.[id],
-				groupSizes
+				{ raise: "2.5", "all-in": "" }
 			)
 		);
+		setGroupRaiseRows([makeRaiseRow()]);
 		setGroupAddError("");
 	}
 
@@ -1050,7 +1073,6 @@ export default function DagEditor({
 						onSelectAction={(nodeId, actionKey) => {
 							setSelectedNodeId(nodeId);
 							setSelectedActionKey(actionKey);
-							setAddActionError("");
 						}}
 						onAddAction={(nodeId) => {
 							selectNode(nodeId);
@@ -1064,50 +1086,60 @@ export default function DagEditor({
 					<main className="range-editor-main">
 						{selectedNode ? (
 							<>
-								<section className="range-editor-card">
+								<section className="range-editor-card range-editor-node-card">
 									<div className="range-editor-node-heading">
-										<div>
-											<div className="range-editor-section-heading">
+										<div className="range-editor-node-title">
+											<div className="range-editor-eyebrow">
 												{solution.rootNodeId === selectedNodeId
 													? "Root Decision"
 													: "Decision Node"}
 											</div>
-											<h2>{selectedNode.position || getNodeIdPosition(selectedNodeId)}</h2>
+											<h2>
+												{selectedNode.position || getNodeIdPosition(selectedNodeId)}
+											</h2>
 										</div>
-										{selectedNode.terminal === true ? (
+										<div className="range-editor-node-actions">
+											{selectedNode.terminal === true ? (
+												<button
+													type="button"
+													className="range-editor-secondary"
+													onClick={reopenNode}
+													disabled={!canWriteFiles}
+												>
+													Reopen as decision
+												</button>
+											) : (
+												<span className="range-editor-count">
+													{selectedActions.length} action
+													{selectedActions.length === 1 ? "" : "s"}
+												</span>
+											)}
 											<button
 												type="button"
-												className="range-editor-secondary"
-												onClick={reopenNode}
-												disabled={!canWriteFiles}
+												className="range-editor-danger range-editor-delete-node"
+												onClick={deleteSelectedNode}
+												disabled={
+													!canWriteFiles ||
+													selectedNodeId === solution?.rootNodeId
+												}
+												aria-label="Delete node"
+												title={
+													selectedNodeId === solution?.rootNodeId
+														? "The root node cannot be deleted"
+														: "Delete this node"
+												}
 											>
-												Reopen as decision
+												<TrashIcon />
+												<span>Delete</span>
 											</button>
-										) : (
-											<span className="range-editor-count">
-												{selectedActions.length} action
-												{selectedActions.length === 1 ? "" : "s"}
-											</span>
-										)}
-										<button
-											type="button"
-											className="range-editor-danger"
-											onClick={deleteSelectedNode}
-											disabled={
-												!canWriteFiles ||
-												selectedNodeId === solution?.rootNodeId
-											}
-											title={
-												selectedNodeId === solution?.rootNodeId
-													? "The root node cannot be deleted"
-													: "Delete this node"
-											}
-										>
-											<TrashIcon />
-											<span>Delete node</span>
-										</button>
+										</div>
 									</div>
-									<code className="range-editor-node-path">{selectedNodeId}</code>
+									<div className="range-editor-node-path-row">
+										<span>Node path</span>
+										<code className="range-editor-node-path" title={selectedNodeId}>
+											{selectedNodeId}
+										</code>
+									</div>
 									{selectedNode.terminal !== true && selectedActions.length > 0 && (
 										<>
 											{nodeRangeCheck && (() => {
@@ -1126,7 +1158,12 @@ export default function DagEditor({
 										</>
 									)}
 									{selectedNode.terminal !== true && selectedActions.length > 0 && (
-										<div className="range-editor-action-list">
+										<div className="range-editor-actions-section">
+											<div className="range-editor-actions-heading">
+												<h3>Actions</h3>
+												<span>Select an action to edit its range and outcome</span>
+											</div>
+											<div className="range-editor-action-list">
 											{getOrderedActions(selectedActions).map(({ action, key }) => {
 												const label = getActionLabel(action);
 												const target = getActionTarget(action);
@@ -1179,9 +1216,12 @@ export default function DagEditor({
 																	</span>
 																</span>
 															</span>
-															<span className="range-editor-action-bottom">
+															<span
+																className="range-editor-action-bottom"
+																title={target || undefined}
+															>
 																{target
-																	? `Next: ${target}`
+																	? `Next: ${getNodeIdPosition(target)}`
 																	: terminal
 																		? "Ends the hand"
 																		: rare
@@ -1203,6 +1243,7 @@ export default function DagEditor({
 													</div>
 												);
 											})}
+											</div>
 										</div>
 									)}
 
@@ -1231,7 +1272,10 @@ export default function DagEditor({
 										onClick={() => setGroupActionsOpen((open) => !open)}
 										aria-expanded={groupActionsOpen}
 									>
-										<span className="range-editor-section-heading">Add actions</span>
+										<span className="range-editor-collapse-title">
+											<span className="range-editor-section-heading">Add actions</span>
+											<span>Choose a preset or create custom actions</span>
+										</span>
 										<span className="toggle-arrow" aria-hidden="true">
 											{groupActionsOpen ? "▼" : "▶"}
 										</span>
@@ -1277,17 +1321,100 @@ export default function DagEditor({
 
 											<div className="range-editor-group-actions">
 												{ACTION_TYPES.map((type) => {
+													if (type.id === "raise") {
+														return groupRaiseRows.map((row) => {
+															const label = makeActionLabel(type.id, row.size);
+															const previewItem = groupPreview.find(
+																(item) => item.key === row.id
+															);
+															const existing = Boolean(
+																label &&
+																selectedActions.some(
+																	(action) =>
+																		normalizeRaiseActionLabel(getActionLabel(action)) ===
+																		normalizeRaiseActionLabel(label)
+																)
+															);
+															const invalid = Boolean(
+																row.selected &&
+																(previewItem?.duplicate ||
+																	previewItem?.duplicateSelected ||
+																	!label)
+															);
+															const checkboxId = `range-editor-group-${row.id}`;
+															return (
+																<div
+																	key={row.id}
+																	className={[
+																		"range-editor-group-action",
+																		"range-editor-group-raise-row",
+																		row.selected ? "selected" : "",
+																		existing && row.selected ? "existing" : "",
+																		!row.selected ? "trailing" : "",
+																	].filter(Boolean).join(" ")}
+																	style={{
+																		"--dag-action-color": actionColor(label || type.label),
+																	}}
+																>
+																	<label
+																		className="range-editor-group-action-choice"
+																		htmlFor={checkboxId}
+																	>
+																		<input
+																			id={checkboxId}
+																			type="checkbox"
+																			className="range-editor-group-raise-checkbox"
+																			checked={row.selected}
+																			onChange={() => toggleGroupRaise(row.id)}
+																			disabled={!canWriteFiles}
+																		/>
+																		<span className="range-editor-group-action-label">
+																			{type.label}
+																		</span>
+																		{invalid && (
+																			<span className="range-editor-group-existing">
+																				{!label
+																					? "Invalid size"
+																					: previewItem?.duplicateSelected
+																						? "Duplicate size"
+																						: "Already exists"}
+																			</span>
+																		)}
+																	</label>
+																	{row.selected && (
+																		<input
+																			type="number"
+																			min="0.01"
+																			step="0.01"
+																			className="range-editor-group-size range-editor-group-raise-size"
+																			value={row.size}
+																			onChange={(event) =>
+																				updateGroupRaiseSize(
+																					row.id,
+																					event.target.value
+																				)
+																			}
+																			placeholder="2.5"
+																			aria-label="Raise size in big blinds"
+																		/>
+																	)}
+																</div>
+															);
+														});
+													}
 													const size = groupSizes[type.id] || "";
 													const label = makeActionLabel(type.id, size);
 													const selected = groupSelectedKinds.includes(type.id);
-													const existing = Boolean(
-														label &&
-														selectedActions.some(
-															(action) =>
-																getActionLabel(action).toLowerCase() ===
-																label.toLowerCase()
+													const existing = type.id === "raise"
+														? Boolean(
+															label &&
+															selectedActions.some(
+																(action) =>
+																	normalizeRaiseActionLabel(getActionLabel(action)) ===
+																	normalizeRaiseActionLabel(label)
+															)
 														)
-													);
+														: actionKindExists(selectedActions, type.id);
 													const checkboxId = `range-editor-group-${type.id}`;
 													return (
 														<div
@@ -1332,7 +1459,7 @@ export default function DagEditor({
 																		updateGroupSize(type.id, event.target.value)
 																	}
 																	placeholder={
-																		type.optionalSize ? "Optional" : "2.5"
+																		type.id === "all-in" ? "Allin size" : "2.5"
 																	}
 																	aria-label={`${type.label} size in big blinds`}
 																/>
@@ -1351,16 +1478,21 @@ export default function DagEditor({
 														<span>Preview</span>
 														<span>
 															{groupPreview.filter(
-																(item) => item.label && !item.duplicate
+																(item) =>
+																	item.label &&
+																	!item.duplicate &&
+																	!item.duplicateSelected
 															).length} ready to add
 														</span>
 													</div>
 													{groupPreview.map((item) => (
 														<div
-															key={item.kind}
+															key={item.key}
 															className={[
 																"range-editor-group-preview-row",
-																item.duplicate || item.outcome === "invalid"
+																item.duplicate ||
+																item.duplicateSelected ||
+																item.outcome === "invalid"
 																	? "warning"
 																	: "",
 															].filter(Boolean).join(" ")}
@@ -1379,7 +1511,9 @@ export default function DagEditor({
 																<span
 																	className={[
 																		"range-editor-group-preview-status",
-																		item.duplicate || item.outcome === "invalid"
+																		item.duplicate ||
+																		item.duplicateSelected ||
+																		item.outcome === "invalid"
 																			? "warning"
 																			: item.target
 																				? "continue"
@@ -1388,6 +1522,8 @@ export default function DagEditor({
 																>
 																	{item.duplicate
 																		? "Exists"
+																		: item.duplicateSelected
+																			? "Duplicate size"
 																		: item.outcome === "invalid"
 																			? "Needs size"
 																			: item.target
@@ -1399,13 +1535,17 @@ export default function DagEditor({
 																<span>
 																	{item.duplicate
 																		? "Choose another action or size"
+																		: item.duplicateSelected
+																			? "Each selected Raise must have a unique size"
 																		: item.outcome === "invalid"
 																			? "Enter a size greater than zero"
 																			: item.target
 																				? "Next decision"
 																				: "No continuation node will be created"}
 																</span>
-																{item.target && !item.duplicate && (
+																{item.target &&
+																	!item.duplicate &&
+																	!item.duplicateSelected && (
 																	<code>{item.target}</code>
 																)}
 															</div>
@@ -1427,11 +1567,16 @@ export default function DagEditor({
 													onClick={() => {
 														setGroupPresetId("custom");
 														setGroupSelectedKinds([]);
+														setGroupSizes({
+															raise: "2.5",
+															"all-in": "",
+														});
+														setGroupRaiseRows([makeRaiseRow()]);
 														setGroupAddError("");
 													}}
 													disabled={!canWriteFiles}
 												>
-													Cancel
+													Clear
 												</button>
 												<button
 													type="button"
@@ -1439,11 +1584,12 @@ export default function DagEditor({
 													onClick={addActionGroup}
 													disabled={
 														!canWriteFiles ||
-														groupSelectedKinds.length === 0 ||
+														groupPreview.length === 0 ||
 														groupPreview.some(
 															(item) =>
 																!item.label ||
-																item.duplicate
+																item.duplicate ||
+																item.duplicateSelected
 														)
 													}
 												>
@@ -1455,8 +1601,8 @@ export default function DagEditor({
 														<path d="M12 5v14M5 12h14" />
 													</svg>
 													<span>
-														Add {groupSelectedKinds.length} action
-														{groupSelectedKinds.length === 1 ? "" : "s"}
+														Add {groupPreview.length} action
+														{groupPreview.length === 1 ? "" : "s"}
 													</span>
 												</button>
 											</div>
@@ -1664,125 +1810,6 @@ export default function DagEditor({
 									</section>
 								)}
 
-								<section className="range-editor-card" ref={addCardRef}>
-									<button
-										type="button"
-										className="range-editor-collapse-toggle"
-										onClick={() => setSingleActionOpen((open) => !open)}
-										aria-expanded={singleActionOpen}
-									>
-										<span className="range-editor-section-heading">Add an action</span>
-										<span className="toggle-arrow" aria-hidden="true">
-											{singleActionOpen ? "▼" : "▶"}
-										</span>
-									</button>
-									{singleActionOpen && (selectedNode.terminal === true ? (
-										<p className="range-editor-help">
-											Reopen this node before adding actions.
-										</p>
-									) : (
-										<form
-											className="range-editor-add-form"
-											onSubmit={addAction}
-										>
-											<label>
-												Action
-												<select
-													value={newActionKind}
-													onChange={(event) => {
-														const kind = event.target.value;
-														if (kind === "all-in" && newActionSize === "2.5") {
-															setNewActionSize("100");
-														} else if (
-															newActionKind === "all-in" &&
-															kind !== "all-in" &&
-															newActionSize === "100"
-														) {
-															setNewActionSize("2.5");
-														}
-														setNewActionKind(kind);
-													}}
-												>
-													{ACTION_TYPES.map((type) => (
-														<option key={type.id} value={type.id}>
-															{type.label}
-														</option>
-													))}
-												</select>
-											</label>
-											{selectedActionType?.hasSize && (
-												<label>
-													{newActionKind === "all-in"
-														? "All-in size (optional, bb)"
-														: "Size (bb)"}
-													<input
-														type="number"
-														min="0.01"
-														step="0.01"
-														value={newActionSize}
-														onChange={(event) =>
-															setNewActionSize(event.target.value)
-														}
-														placeholder={
-															newActionKind === "all-in" ? "100" : "2.5"
-														}
-													/>
-												</label>
-											)}
-											<label>
-												After this action
-												<select
-													value={effectiveOutcome}
-													onChange={(event) =>
-														setNewActionOutcome(event.target.value)
-													}
-												>
-													<option
-														value="continue"
-														disabled={!nextNodePreview}
-													>
-														Continue to next decision
-													</option>
-													<option value="terminal">End the hand</option>
-													<option value="rare">Almost never reached</option>
-												</select>
-											</label>
-											{actionLabel && (
-												<div className="range-editor-id-preview">
-													<span>Action label</span>
-													<strong>{actionLabel}</strong>
-													<span>Generated next node</span>
-													<code>
-														{effectiveOutcome === "continue"
-															? nextNodePreview
-															: effectiveOutcome === "terminal"
-																? "Terminal action (no node)"
-																: "Rare action (no node)"}
-													</code>
-												</div>
-											)}
-											{addActionError && (
-												<p className="range-editor-form-error" role="alert">
-													{addActionError}
-												</p>
-											)}
-											<button
-												type="submit"
-												className="range-editor-primary"
-												disabled={!actionLabel || !canWriteFiles}
-											>
-												<svg
-													className="range-editor-button-icon"
-													viewBox="0 0 24 24"
-													aria-hidden="true"
-												>
-													<path d="M12 5v14M5 12h14" />
-												</svg>
-												<span>Add action</span>
-											</button>
-										</form>
-									))}
-								</section>
 								{selectedNodeIssues.length > 0 && (
 									<details className="range-editor-node-issues">
 										<summary>
