@@ -1134,12 +1134,6 @@ export default function DagEditor({
 											</button>
 										</div>
 									</div>
-									<div className="range-editor-node-path-row">
-										<span>Node path</span>
-										<code className="range-editor-node-path" title={selectedNodeId}>
-											{selectedNodeId}
-										</code>
-									</div>
 									{selectedNode.terminal !== true && selectedActions.length > 0 && (
 										<>
 											{nodeRangeCheck && (() => {

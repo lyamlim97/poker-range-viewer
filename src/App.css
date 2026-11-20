@@ -1881,14 +1881,16 @@ button.flagged::after {
 	padding: 14px;
 }
 
-.range-editor-node-card {
+.range-editor-node-card,
+.range-editor-group-card {
 	position: relative;
 	padding: 16px;
 	overflow: hidden;
 	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-.range-editor-node-card::before {
+.range-editor-node-card::before,
+.range-editor-group-card::before {
 	position: absolute;
 	top: 0;
 	right: 0;
@@ -1906,7 +1908,10 @@ button.flagged::after {
 }
 
 .range-editor-node-title {
+	display: flex;
 	flex: 1 1 auto;
+	align-items: baseline;
+	gap: 8px;
 	min-width: 0;
 }
 
@@ -1917,6 +1922,17 @@ button.flagged::after {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.range-editor-node-title .range-editor-eyebrow {
+	flex: none;
+	color: var(--text);
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+.range-editor-node-title h2 {
+	color: var(--muted);
 }
 
 .range-editor-node-actions {
@@ -2010,44 +2026,11 @@ button.flagged::after {
 }
 
 .range-editor-node-heading h2,
+.range-editor-node-title .range-editor-eyebrow,
 .range-editor-card-heading h3 {
 	margin: 0;
 	font-size: 16px;
 	font-weight: 650;
-}
-
-.range-editor-node-path-row {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	min-width: 0;
-	margin-bottom: 14px;
-	padding: 7px 9px;
-	border: 1px solid var(--border);
-	border-radius: 7px;
-	background: linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent), rgba(0, 0, 0, 0.16);
-	color: var(--muted);
-	font-size: 10px;
-}
-
-.range-editor-node-path-row > span {
-	flex: none;
-	font-weight: 650;
-	letter-spacing: 0.35px;
-	text-transform: uppercase;
-}
-
-.range-editor-node-path {
-	display: block;
-	flex: 1 1 auto;
-	min-width: 0;
-	margin: 0;
-	padding: 0;
-	overflow: hidden;
-	border-radius: 0;
-	background: transparent;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 .range-editor-card > .rv-action-summary {
@@ -2278,10 +2261,10 @@ button.flagged::after {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	width: 100%;
-	min-height: 44px;
-	margin: -5px 0 10px;
-	padding: 5px 8px;
+	width: calc(100% + 16px);
+	min-height: 48px;
+	margin: -5px -8px 10px;
+	padding: 5px 8px 9px;
 	border: 1px solid transparent;
 	border-radius: 6px;
 	background: transparent;
@@ -2617,7 +2600,7 @@ button.flagged::after {
 	opacity: 0.55;
 }
 
-.range-editor-group-action.range-editor-group-raise-row.existing {
+.range-editor-group-raise-row.existing {
 	border-color: rgba(251, 191, 36, 0.48);
 	border-left-color: var(--warn);
 	background: rgba(251, 191, 36, 0.055);
@@ -2631,11 +2614,6 @@ button.flagged::after {
 	gap: 8px;
 	min-width: 0;
 	min-height: 30px;
-	cursor: pointer;
-}
-
-.range-editor-group-action.existing:not(.range-editor-group-raise-row) .range-editor-group-action-choice {
-	cursor: not-allowed;
 }
 
 .range-editor-group-action input[type="checkbox"] {
@@ -2799,8 +2777,6 @@ button.flagged::after {
 
 .range-editor-group-preview-detail code {
 	min-width: 0;
-	overflow-wrap: anywhere;
-	color: #cbd5e1;
 	text-align: right;
 }
 
@@ -2820,14 +2796,12 @@ button.flagged::after {
 	border-top: 1px solid var(--border);
 }
 
-.range-editor-group-footer .range-editor-secondary,
-.range-editor-group-footer .range-editor-primary {
+.range-editor-group-footer > button {
 	min-height: 34px;
 	margin: 0;
 }
 
 .range-editor-primary {
-	justify-self: start;
 	height: 38px;
 	gap: 7px;
 	min-width: 112px;
