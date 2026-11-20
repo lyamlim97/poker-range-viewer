@@ -4,10 +4,6 @@ const KNOWN = {
 	jam: "var(--action-jam)",
 	allin: "var(--action-jam)",
 	raise: "var(--action-raise)",
-	"3bet": "var(--action-3bet)",
-	"4bet": "var(--action-4bet)",
-	"5bet": "var(--action-5bet)",
-	squeeze: "var(--action-squeeze)",
 	bet: "var(--action-bet)",
 	call: "var(--action-call)",
 	fold: "var(--action-fold)",
@@ -17,7 +13,7 @@ export function actionColor(action) {
 	const key = action.toLowerCase().replace(/[\s-]+/g, "");
 	if (KNOWN[key]) return KNOWN[key];
 
-	const baseAction = key.match(/^(jam|allin|raise|3bet|4bet|5bet|squeeze|bet|call|fold)/)?.[1];
+	const baseAction = key.match(/^(jam|allin|raise|bet|call|fold)/)?.[1];
 	if (baseAction && KNOWN[baseAction]) return KNOWN[baseAction];
 
 	return "var(--action-other)";
@@ -31,13 +27,9 @@ const ACTION_RANK_RES = [
 	/^fold\b/i,
 	/^call\b/i,
 	/^(?:raise|bet)\b/i,
-	/^3[\s-]?bet\b/i,
-	/^4[\s-]?bet\b/i,
-	/^5[\s-]?bet\b/i,
-	/^squeeze\b/i,
 	/^(?:all[\s-]?in|jam)\b/i,
 ];
-const AGGRESSIVE_RE = /^(?:raise|bet|all[\s-]?in|jam|[345][\s-]?bet|squeeze)/i;
+const AGGRESSIVE_RE = /^(?:raise|bet|all[\s-]?in|jam)/i;
 const AMOUNT_RE = /([\d.]+)\s*(?:bb)?\s*$/i;
 
 export function getActionLabel(action) {
@@ -85,7 +77,7 @@ export function classifyAction(action) {
 	return {
 		category: actionRank >= 0 ? actionRank : ACTION_RANK_RES.length,
 		rank: 0,
-		size: actionRank >= 2 && actionRank <= 6 ? size : 0,
+		size: actionRank === 2 ? size : 0,
 	};
 }
 

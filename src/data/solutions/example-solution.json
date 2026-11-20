@@ -19,55 +19,61 @@
 				{
 					"id": "fold",
 					"label": "Fold",
+					"terminal": true,
 					"rawRangeText": ""
 				},
 				{
 					"id": "raise-2-5",
 					"label": "Raise 2.5",
-					"nextNodeId": "EP_F_MP_F_CO_F_BU_RFI_SB",
+					"nextNodeId": "EP_F_MP_F_CO_F_BU_R_SB",
 					"rawRangeText": "22+, A2s+, A2o+, K2s+, K7o+, Q4s+, Q9o+, J6s+, J8o+, T6s+, T8o+, 96s+, 98o, 85s+, 75s+, 65s, 54s"
 				}
 			]
 		},
-		"EP_F_MP_F_CO_F_BU_RFI_SB": {
-			"nodeId": "EP_F_MP_F_CO_F_BU_RFI_SB",
+		"EP_F_MP_F_CO_F_BU_R_SB": {
+			"nodeId": "EP_F_MP_F_CO_F_BU_R_SB",
 			"position": "SB",
 			"actions": [
 				{
 					"id": "fold",
 					"label": "Fold",
-					"nextNodeId": "EP_F_MP_F_CO_F_BU_RFI_SB_F_BB",
+					"nextNodeId": "EP_F_MP_F_CO_F_BU_R_SB_F_BB",
 					"rawRangeText": ""
 				},
 				{
 					"id": "call-2-5",
 					"label": "Call 2.5",
+					"terminal": true,
 					"rawRangeText": "22-88, A2s-A3s, A6s-A9s, K8s-KTs, Q8s-QTs, J8s-JTs, T8s-T9s, 98s"
 				},
 				{
-					"id": "three-bet-10",
-					"label": "3-Bet 10",
+					"id": "raise-10",
+					"label": "Raise 10",
+					"terminal": true,
 					"rawRangeText": "99+, A4s-A5s, ATs+, ATo+, KJo+, KJs+, QJs"
 				}
 			]
 		},
-		"EP_F_MP_F_CO_F_BU_RFI_SB_F_BB": {
-			"nodeId": "EP_F_MP_F_CO_F_BU_RFI_SB_F_BB",
+		"EP_F_MP_F_CO_F_BU_R_SB_F_BB": {
+			"nodeId": "EP_F_MP_F_CO_F_BU_R_SB_F_BB",
 			"position": "BB",
 			"actions": [
 				{
 					"id": "fold",
 					"label": "Fold",
+					"terminal": true,
 					"rawRangeText": ""
 				},
 				{
 					"id": "call-2-5",
 					"label": "Call 2.5",
+					"terminal": true,
 					"rawRangeText": "22-88, A2s-A3s, A6s-A9s, K4s-KTs, Q5s-QTs, J6s-JTs, T7s-T9s, 98s, QTo+, KTo, JTo,A5o-A9o"
 				},
 				{
-					"id": "three-bet-10",
-					"label": "3-Bet 10",
+					"id": "raise-10",
+					"label": "Raise 10",
+					"terminal": true,
 					"rawRangeText": "99+, A4s-A5s, ATs+, ATo+, KJo+, KJs+, QJs"
 				}
 			]

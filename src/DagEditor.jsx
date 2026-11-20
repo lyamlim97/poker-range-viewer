@@ -49,10 +49,6 @@ const ACTION_TYPES = [
 	{ id: "fold", label: "Fold", hasSize: false },
 	{ id: "call", label: "Call", hasSize: false },
 	{ id: "raise", label: "Raise", hasSize: true },
-	{ id: "3-bet", label: "3-Bet", hasSize: true },
-	{ id: "4-bet", label: "4-Bet", hasSize: true },
-	{ id: "5-bet", label: "5-Bet", hasSize: true },
-	{ id: "squeeze", label: "Squeeze", hasSize: true },
 	{ id: "all-in", label: "All-in", hasSize: true, optionalSize: true },
 ];
 
@@ -161,10 +157,6 @@ export default function DagEditor({
 	const [groupSelectedKinds, setGroupSelectedKinds] = useState(["fold", "call"]);
 	const [groupSizes, setGroupSizes] = useState({
 		raise: "2.5",
-		"3-bet": "2.5",
-		"4-bet": "2.5",
-		"5-bet": "2.5",
-		squeeze: "2.5",
 		"all-in": "",
 	});
 	const [groupAddError, setGroupAddError] = useState("");

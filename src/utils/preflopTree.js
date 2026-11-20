@@ -366,7 +366,7 @@ export function resolveSpotFromSolution(activePosition, actionHistory = {}, solu
 	const { raises } = analyzeActionHistory(actionHistory);
 	const lastAggressor = raises[raises.length - 1];
 	const title = lastAggressor
-		? `${position} vs ${lastAggressor.position} ${raises.length === 1 ? "Open" : `${raises.length + 1}-Bet`}`
+		? `${position} vs ${lastAggressor.position} ${raises.length === 1 ? "Open" : "Raise"}`
 		: `${position} RFI (Open)`;
 	const path = normalizeActionPath(actionHistory)
 		.map(({ position: actor, action }) => `${actor} ${action}`)

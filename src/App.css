@@ -23,10 +23,6 @@
 	/* Action colours: this is the shared colour location for the viewer and DAG */
 	--action-jam: #7f1d1d;
 	--action-raise: #dc2626;
-	--action-3bet: #ef4444;
-	--action-4bet: #b91c1c;
-	--action-5bet: #991b1b;
-	--action-squeeze: #9f1239;
 	--action-bet: var(--danger);
 	--action-call: var(--positive);
 	--action-fold: #2a7785;
