@@ -1089,14 +1089,22 @@ export default function DagEditor({
 								<section className="range-editor-card range-editor-node-card">
 									<div className="range-editor-node-heading">
 										<div className="range-editor-node-title">
-											<div className="range-editor-eyebrow">
-												{solution.rootNodeId === selectedNodeId
-													? "Root Decision"
-													: "Decision Node"}
+											<div className="range-editor-node-title-row">
+												<div className="range-editor-eyebrow">
+													{solution.rootNodeId === selectedNodeId
+														? "Root Decision"
+														: "Decision Node"}
+												</div>
+												<h2>
+													{selectedNode.position || getNodeIdPosition(selectedNodeId)}
+												</h2>
 											</div>
-											<h2>
-												{selectedNode.position || getNodeIdPosition(selectedNodeId)}
-											</h2>
+											<code
+												className="range-editor-node-id"
+												aria-label={`Node ID ${selectedNodeId}`}
+											>
+												{selectedNodeId}
+											</code>
 										</div>
 										<div className="range-editor-node-actions">
 											{selectedNode.terminal === true ? (

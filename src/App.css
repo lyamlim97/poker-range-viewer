@@ -1908,11 +1908,23 @@ button.flagged::after {
 }
 
 .range-editor-node-title {
-	display: flex;
 	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.range-editor-node-title-row {
+	display: flex;
 	align-items: baseline;
 	gap: 8px;
-	min-width: 0;
+}
+
+.range-editor-node-id {
+	display: block;
+	margin-top: 3px;
+	color: var(--muted);
+	font-size: 11px;
+	line-height: 1.3;
+	overflow-wrap: anywhere;
 }
 
 .range-editor-node-title h2,
