@@ -43,7 +43,7 @@ export default function ActionSummary({ freq = {} }) {
 							<span className="rv-action-name">{action}</span>
 							<span className="rv-action-pct">{pct.toFixed(1)}%</span>
 							<span className="rv-action-combos">
-								{combos.toFixed(1)} combos
+								{combos.toFixed(2)} combos
 							</span>
 						</div>
 					);
