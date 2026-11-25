@@ -81,6 +81,13 @@ function getSizeText(value) {
 	return String(Number(amount.toFixed(2)));
 }
 
+function getDefaultGroupSizes(solution) {
+	return {
+		raise: "2.5",
+		"all-in": getSizeText(solution?.meta?.stack) || "",
+	};
+}
+
 function normalizeRaiseActionLabel(label) {
 	const text = String(label || "").trim().toLowerCase();
 	const raiseAction = text.match(/^raise\s+(.+)$/);
@@ -402,6 +409,7 @@ export default function DagEditor({
 					rootNodeId && Object.hasOwn(dataNodes, rootNodeId)
 						? rootNodeId
 						: Object.keys(dataNodes)[0] || "";
+				const defaultGroupSizes = getDefaultGroupSizes(data);
 				setSelectedNodeId(
 					initialNodeId
 				);
@@ -415,10 +423,10 @@ export default function DagEditor({
 					getAvailableGroupKinds(
 						"fold-call",
 						dataNodes[initialNodeId],
-						{ raise: "2.5", "all-in": "" }
+						defaultGroupSizes
 					)
 				);
-				setGroupSizes({ raise: "2.5", "all-in": "" });
+				setGroupSizes(defaultGroupSizes);
 				setGroupRaiseRows([makeRaiseRow()]);
 				setGroupAddError("");
 				setGroupActionsOpen(true);
@@ -757,7 +765,7 @@ export default function DagEditor({
 		setSelectedActionKey(additions[0].id);
 		setGroupPresetId("custom");
 		setGroupSelectedKinds([]);
-		setGroupSizes({ raise: "2.5", "all-in": "" });
+		setGroupSizes(getDefaultGroupSizes(solution));
 		setGroupRaiseRows([makeRaiseRow()]);
 		setGroupAddError("");
 	}
@@ -908,12 +916,13 @@ export default function DagEditor({
 		setSelectedNodeId(id);
 		setSelectedActionKey("");
 		setGroupPresetId("fold-call");
-		setGroupSizes({ raise: "2.5", "all-in": "" });
+		const defaultGroupSizes = getDefaultGroupSizes(solution);
+		setGroupSizes(defaultGroupSizes);
 		setGroupSelectedKinds(
 			getAvailableGroupKinds(
 				"fold-call",
 				solution?.nodes?.[id],
-				{ raise: "2.5", "all-in": "" }
+				defaultGroupSizes
 			)
 		);
 		setGroupRaiseRows([makeRaiseRow()]);
@@ -1569,10 +1578,7 @@ export default function DagEditor({
 													onClick={() => {
 														setGroupPresetId("custom");
 														setGroupSelectedKinds([]);
-														setGroupSizes({
-															raise: "2.5",
-															"all-in": "",
-														});
+														setGroupSizes(getDefaultGroupSizes(solution));
 														setGroupRaiseRows([makeRaiseRow()]);
 														setGroupAddError("");
 													}}
