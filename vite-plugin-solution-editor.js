@@ -14,7 +14,7 @@ const allowedSolutionIds = new Set(
 		.map((solution) => solution.id)
 		.filter((id) => typeof id === "string"),
 );
-const MAX_SOLUTION_BYTES = 20 * 1024 * 1024;
+const MAX_SOLUTION_BYTES = 50 * 1024 * 1024;
 
 function sendJson(response, status, value) {
 	response.writeHead(status, {
@@ -51,7 +51,7 @@ function readRequestBody(request) {
 async function readJsonBody(request, response) {
 	const body = await readRequestBody(request);
 	if (body === null) {
-		sendJson(response, 413, { error: "The solution JSON exceeds the 20 MB limit." });
+		sendJson(response, 413, { error: "The solution JSON exceeds the 50 MB limit." });
 		return null;
 	}
 

@@ -47,9 +47,126 @@ Select an action to paste its range. The editor stores the pasted text unchanged
 
 Changes are autosaved to the selected `src/data/solutions/<id>.json` file after a short pause, but only when running the local Vite development server (`npm run dev`). The save endpoint writes only existing solution files. If the file changes outside the editor while it is open, autosave stops rather than overwriting the external edit; choose **Overwrite file** to keep the editor's version or **Reload from disk** to discard editor changes and load the external version. In the Range Viewer, use **Reload** to load the latest saved solution.
 
+The local editor save endpoint accepts solution JSON files up to 50 MiB.
+
 The editor intentionally selects from existing solutions; add new solution files and their metadata to `src/data/solution-index.json` before editing them here, then restart the dev server so the asset list and save allowlist are refreshed.
 
-## 5. Solution file structure
+## 5. Import Zeno preflop strategies
+
+The importer creates the same `meta`, `rootNodeId`, and `nodes` solution JSON used by the existing files. It is preflop-only: board, flop, turn, river, and postflop routes are rejected. Visible Zeno actions are preferred; hidden zero-frequency actions are not included. Each range comes from Zeno's **Copy range here** output, with the exact 1326-combo `/api/preflop` response used only as a fallback.
+
+### 5.1. Install
+
+```bash
+npm install
+npm run setup:zeno
+```
+
+Show all importer options:
+
+```bash
+npm run scrape:zeno -- --help
+```
+
+### 5.2. Quick anonymous test
+
+Public branches can be checked without signing in. Use `--dry-run` so nothing is written:
+
+```bash
+npm run scrape:zeno -- --dry-run "https://zenosolver.com/study?tree=a100p6lr500&pf=UTG-f&r=Xbe2aDHT"
+```
+
+Anonymous runs will stop when Zeno requires sign-in. They do not fabricate terminal nodes for protected branches.
+
+### 5.3. Sign in with normal Edge
+
+Google may reject sign-in from a Playwright-launched browser. For a complete authenticated import, launch normal Edge with local debugging and sign in there.
+
+```bash
+"/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" --remote-debugging-port=9222 --user-data-dir="$LOCALAPPDATA/ZenoImporterProfile" "https://zenosolver.com/study?tree=a100p6lr500&r=aigpQavi" &
+```
+
+If `9222` is already in use, choose another port and use that same port in `--cdp-url`.
+
+1. Keep the Edge window open.
+2. Sign in to Zeno normally.
+3. Confirm the Zeno page shows the **Account** button instead of **Sign in**.
+4. Leave the required Hold'em strategy page open.
+
+### 5.4. Run the complete import
+
+```bash
+npm run scrape:zeno -- --cdp-url "http://127.0.0.1:9222" --id zeno-100bb-nl500-2p5bb --register "https://zenosolver.com/study?tree=a100p6lr500&r=aigpQavi"
+```
+
+The importer attaches to the existing browser and does not export or print authentication cookies.
+
+Verbose progress is logged throughout the run. It includes the active tree, resume/checkpoint state, unique nodes, action counts by type, resolved/unresolved branches, terminal/rare totals, elapsed time, node rate, current line, active delay/jitter, and output/checkpoint sizes. Individual browser timing events are aggregated so range copying, navigation, endpoint classification, parent restoration, and other browser stages are reported as periodic and final count/average/min/max summaries rather than one line per event. Checkpoint and output write durations are included in the same summary.
+
+Logs are written to the console and appended to a text file. By default, an output named `src/data/solutions/zeno-100bb-nl500-2p5bb.json` logs to `src/data/solutions/zeno-100bb-nl500-2p5bb.log`. Interrupted/resumed runs append to the same log with timestamps. Use `--log <path>` to choose another file, or `--no-log` to disable file logging.
+
+### 5.5. Output and resume behavior
+
+With the command above, the script writes directly to:
+
+```text
+src/data/solutions/zeno-100bb-nl500-2p5bb.json
+```
+
+Progress is atomically checkpointed to:
+
+```text
+src/data/solutions/zeno-100bb-nl500-2p5bb.json.checkpoint
+```
+
+The checkpoint does not end in `.json`, so Vite does not load it as a solution. Each browser mutation updates the latest in-memory event immediately, while the checkpoint and draft output are atomically flushed at most once per `--checkpoint-flush-ms` interval (5,000 ms by default). The flush writes the latest complete in-memory snapshot, not a delayed copy, so multiple rapid actions are batched without losing the state needed by resume. Fatal errors, `SIGINT`/`SIGTERM` interruptions, and the end of scraping request an immediate flush before normal shutdown when possible. Successful completion still writes and validates the final solution before removing the checkpoint.
+
+Completed actions and nodes appear in the solution JSON after a flush while the run continues. Unresolved actions are omitted from the draft rather than marked terminal.
+
+Traversal uses an exact-line queue: each preflop decision is copied once, its visible child lines are queued directly, and completed siblings no longer require returning to and reloading the parent. Action delays still apply between network navigations, but no delay is inserted between local clipboard copies.
+
+If the command stops, rerun the same command. Resume is automatic when the default checkpoint exists. The importer skips completed branches and continues unfinished ones. A successfully validated run:
+
+1. replaces the draft with the complete solution,
+2. updates `src/data/solution-index.json` when `--register` is used,
+3. removes only its matching checkpoint.
+
+Resume options:
+
+- `--resume` - require and resume a checkpoint.
+- `--no-resume` - ignore an existing checkpoint and start over.
+- `--checkpoint <path>` - use a custom checkpoint path.
+- `--checkpoint-flush-ms <ms>` - change the minimum checkpoint/draft-output flush interval from the default 5,000 ms.
+- `--concurrency <count>` - reserved for future browser-tab concurrency; only `1` is currently implemented, and larger values are rejected as not implemented.
+- `--force` - replace an existing completed output or registration.
+
+Do not delete the checkpoint if you want to continue. Do not use `--force` merely to handle an `EPERM`/`EACCES` write error; rerun the command after closing programs locking the file.
+
+### 5.6. Slow down the scraper
+
+The default delay is 2,000 ms with ±10% jitter, so each wait is independently randomized between 1,800 and 2,200 ms. A gentler run is:
+
+```bash
+npm run scrape:zeno -- --cdp-url "http://127.0.0.1:9222" --action-delay 5000 --id zeno-100bb-nl500-2p5bb --register "https://zenosolver.com/study?tree=a100p6lr500&r=aigpQavi"
+```
+
+Increase the baseline if needed, for example `--action-delay 10000`. Adjust variance with `--action-jitter 10`; set it to `0` for a fixed delay. `--action-delay 0` disables the delay entirely. Pacing reduces request bursts but cannot bypass an active Zeno quota.
+
+Normal preflop decision loading is capped at 8,000 ms by default and can be adjusted with `--decision-timeout 8000`. Terminal, `FLOP`, hand-over, rare-line, authentication, and quota outcomes are detected separately within a fast initial window, without waiting for the full decision timeout.
+
+The decision-node safety cap is 3,000 by default. Override it with `--max-decisions 3000` if needed.
+
+### 5.7. Common errors
+
+- `Zeno rate-limited strategy loading` / HTTP 429: Zeno paused chart loading. Keep the checkpoint, wait for the quota to reset, then rerun the same command. Do not start with `--no-resume`.
+- `Sign in` / 403 protected strategy: the attached browser is not signed in. Sign in in the normal Edge window and restart the command.
+- `This browser or app may not be secure`: launch normal Edge with `--cdp-url`; do not authenticate inside Playwright's bundled Chromium.
+- `EPERM`, `EACCES`, or `EBUSY` on rename: close editors/watchers locking the output and rerun. The importer retries Windows replacement without deleting the last complete checkpoint, preserves the temporary file during the retry, and then removes the temporary file on failure or success.
+- `Could not map` / `unresolved continuing outcome`: Zeno changed the visible route or tree shape. Keep the checkpoint and do not use `--force` to fabricate a result; rerun after confirming the source URL is unchanged.
+
+An alternative `--login --storage-state` flow exists for authentication providers that support automation-launched browsers. Keep that storage-state file private because it contains authentication data.
+
+## 6. Solution file structure
 
 A solution has three top-level properties:
 
@@ -72,7 +189,7 @@ For example, this action puts the `AA` range on a raise and links it to the MP d
 
 When adding a branch, define its target node in `nodes` and ensure its `nodeId` matches the map key. Keep each action's range with that action; different actions at the same node have separate ranges.
 
-## 6. Other notes
+## 7. Other notes
 
 ### Node IDs and positions
 

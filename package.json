@@ -3,11 +3,17 @@
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
+	"engines": {
+		"node": ">=22.15.0"
+	},
 	"scripts": {
 		"dev": "vite",
 		"build": "vite build",
 		"lint": "oxlint",
-		"preview": "vite preview"
+		"preview": "vite preview",
+		"setup:zeno": "playwright install chromium",
+		"scrape:zeno": "node scripts/scrape-zeno.mjs",
+		"test:zeno-import": "node --test scripts/zeno-import-core.test.mjs"
 	},
 	"dependencies": {
 		"react": "^19.3.1",
@@ -17,6 +23,7 @@
 		"@types/react": "^19.3.0",
 		"@types/react-dom": "^19.3.0",
 		"@vitejs/plugin-react": "^6.1.2",
-		"oxlint": "^1.90.0"
+		"oxlint": "^1.90.0",
+		"playwright": "^1.65.1"
 	}
 }
